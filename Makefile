@@ -4,6 +4,7 @@ TARGET  = data_dictionary
 SRCS    = main.c data_dictionary.c
 
 all: $(TARGET)
+	./$(TARGET)
 
 $(TARGET): $(SRCS)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SRCS)
