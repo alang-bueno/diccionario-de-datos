@@ -23,5 +23,6 @@ typedef struct {
 } Attribute;
 
 int  createDataDictionary(const char *fileName);
+FILE *openDataDictionary(const char *fileName);
 
 #endif 

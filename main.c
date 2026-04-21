@@ -1,17 +1,54 @@
 #include "data_dictionary.h"
 
 int main(void) {
-    const char *archivo = "mi_diccionario.bin";
+    int  opcion   = 0;
+    char fileName[MAX_CHARS];
+    FILE *file    = NULL;
 
-    printf("=== Diccionario de Datos ===\n\n");
+    printf("║     DICCIONARIO DE DATOS     ║\n");
 
-    int resultado = createDataDictionary(archivo);
+    do {
+        printf("  [1] Crear diccionario                \n");
+        printf("  [2] Abrir diccionario existente      \n");
+        printf("  [3] Salir                            \n");
+        printf("Selecciona una opción: ");
+        scanf("%d", &opcion);
+ 
+        switch (opcion) {
+            case 1:
+                printf("\nNombre del nuevo diccionario: ");
+                scanf("%49s", fileName);
+ 
+                if (createDataDictionary(fileName)) {
+                    printf("Listo. Ya puedes abrirlo con la opción 2.\n");
+                }
+                printf("\n");
+                break;
 
-    if (resultado) {
-        printf("\nEl archivo está listo para recibir entidades y atributos.\n");
-    } else {
-        printf("\nNo se pudo inicializar el diccionario.\n");
-    }
+            case 2:
+                printf("\nNombre del diccionario a abrir: ");
+                scanf("%49s", fileName);
+ 
+                file = openDataDictionary(fileName);
+ 
+                if (file != NULL) {
+                    printf("Archivo listo para usarlo.\n");
+                    fclose(file);
+                    file = NULL;
+                }
+                printf("\n");
+                break;
+ 
+            case 3:
+                printf("¡Hasta luego!\n");
+                break;
 
+            default:
+                printf("Opción no válida. Intenta de nuevo.\n\n");
+                break;
+        }
+ 
+    } while (opcion != 3);
+ 
     return 0;
 }
