@@ -7,10 +7,6 @@
 
 #define MAX_CHARS 50
 
-// ─────────────────────────────────────────────
-//  Estructuras
-// ─────────────────────────────────────────────
-
 typedef struct {
     char name[MAX_CHARS];
     long dataPointer;
@@ -20,16 +16,12 @@ typedef struct {
 
 typedef struct {
     char name[MAX_CHARS];
-    int  type;        // 0=INT, 1=FLOAT, 2=CHAR, 3=VARCHAR
+    int  type;        
     int  size;
-    char isPrimaryKey; // 1=Sí, 0=No
+    char isPrimaryKey; 
     long nextAttribute;
 } Attribute;
 
-// ─────────────────────────────────────────────
-//  Funciones
-// ─────────────────────────────────────────────
-
 int  createDataDictionary(const char *fileName);
 
-#endif // DATA_DICTIONARY_H
+#endif 
