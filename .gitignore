@@ -1,0 +1,10 @@
+# Binarios compilados
+data_dictionary
+*.o
+
+# Archivos del diccionario generados en tiempo de ejecución
+*.bin
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
