@@ -1,5 +1,41 @@
 #include "data_dictionary.h"
 
+void entityMenu(FILE *file) {
+    int  opcion = 0;
+    char entityName[MAX_CHARS];
+ 
+    do {
+        printf("        GESTIÓN DE ENTIDADES      \n");
+        printf("  [1] Insertar entidad            \n");
+        printf("  [2] Listar entidades            \n");
+        printf("  [3] Volver al menú principal    \n");
+        printf("Selecciona una opción: ");
+        scanf("%d", &opcion);
+ 
+        switch (opcion) {
+ 
+            case 1:
+                printf("\nNombre de la nueva entidad: ");
+                scanf("%49s", entityName);
+                createEntity(file, entityName);
+                break;
+ 
+            case 2:
+                printEntities(file);
+                break;
+ 
+            case 3:
+                printf("Volviendo al menú principal...\n");
+                break;
+ 
+            default:
+                printf("Opción no válida. Intenta de nuevo.\n");
+                break;
+        }
+ 
+    } while (opcion != 3);
+}
+
 int main(void) {
     int  opcion   = 0;
     char fileName[MAX_CHARS];
@@ -40,7 +76,7 @@ int main(void) {
                 break;
  
             case 3:
-                printf("¡Hasta luego!\n");
+                printf("Fin del programa\n");
                 break;
 
             default:

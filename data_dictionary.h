@@ -6,6 +6,8 @@
 #include <string.h>
 
 #define MAX_CHARS 50
+#define NULL_POINTER                -1L   
+#define MAIN_DATA_DICTIONARY_HEADER  0L   
 
 typedef struct {
     char name[MAX_CHARS];
@@ -24,5 +26,7 @@ typedef struct {
 
 int  createDataDictionary(const char *fileName);
 FILE *openDataDictionary(const char *fileName);
+int   createEntity(FILE *dataDictionary, const char *entityName);
+void  printEntities(FILE *dataDictionary);
 
 #endif 
