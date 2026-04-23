@@ -68,10 +68,11 @@ int main(void) {
                 file = openDataDictionary(fileName);
  
                 if (file != NULL) {
-                    printf("Archivo listo para usarlo.\n");
-                    fclose(file);
-                    file = NULL;
+                   entityMenu(file);
+                   fclose(file);
+                   file = NULL;
                 }
+                
                 printf("\n");
                 break;
  
