@@ -223,3 +223,74 @@ void printEntities(FILE *dataDictionary) {
     printf("\nTotal de entidades: %d\n", count - 1);
 }
 
+int removeEntity(FILE *dataDictionary, const char *entityName) {
+    if (entityName == NULL || entityName[0] == '\0') {
+        printf("Error: El nombre de la entidad no puede estar vacío.\n");
+        return 0;
+    }
+ 
+    long currentEntityDir = NULL_POINTER;
+    long currentEntityPtr = MAIN_DATA_DICTIONARY_HEADER;
+    int  entityFound      = 0;
+
+    fseek(dataDictionary, currentEntityPtr, SEEK_SET);
+    if (fread(&currentEntityDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la cabecera del diccionario.\n");
+        return 0;
+    }
+ 
+    while (currentEntityDir != NULL_POINTER && entityFound == 0) {
+        Entity currentEntity;
+        fseek(dataDictionary, currentEntityDir, SEEK_SET);
+        if (fread(&currentEntity, sizeof(Entity), 1, dataDictionary) != 1) {
+            printf("Error: Fallo al leer entidad en offset %ld.\n",
+                   currentEntityDir);
+            return 0;
+        }
+ 
+        if (strcmp(entityName, currentEntity.name) == 0) {
+            printf("¿Seguro que deseas eliminar la entidad '%s'? (s/n): ",
+                   entityName);
+            char respuesta;
+            scanf(" %c", &respuesta);
+ 
+            if (respuesta != 's' && respuesta != 'S') {
+                printf("Operación cancelada. No se eliminó ninguna entidad.\n");
+                return 0;
+            }
+            printf("\nEstado ANTES de eliminar:\n");
+            printEntities(dataDictionary);
+            fseek(dataDictionary, currentEntityPtr, SEEK_SET);
+            if (fwrite(&currentEntity.nextEntity, sizeof(long), 1,
+                       dataDictionary) != 1) {
+                printf("Error: No se pudo actualizar el puntero anterior.\n");
+                return 0;
+            }
+            entityFound = 1;
+        } else {
+            currentEntityPtr = currentEntityDir
+                               + (long)sizeof(Entity)
+                               - (long)sizeof(long);
+            currentEntityDir = currentEntity.nextEntity;
+        }
+    }
+
+    if (entityFound) {
+        printf("\nEntidad '%s' eliminada correctamente.\n", entityName);
+        long firstEntity;
+        fseek(dataDictionary, MAIN_DATA_DICTIONARY_HEADER, SEEK_SET);
+        fread(&firstEntity, sizeof(long), 1, dataDictionary);
+        if (firstEntity == NULL_POINTER) {
+            printf("El diccionario ha quedado vacío.\n");
+        } else {
+            printf("\nEstado DESPUÉS de eliminar:\n");
+            printEntities(dataDictionary);
+        }
+    } else {
+        printf("Error: No se encontró la entidad '%s' en el diccionario.\n",
+               entityName);
+    }
+ 
+    return entityFound;
+}
+
