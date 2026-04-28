@@ -1,4 +1,5 @@
 #include "data_dictionary.h"
+#include <ctype.h>
 
 int createDataDictionary(const char *fileName) {
     if (fileName == NULL || fileName[0] == '\0') {
@@ -294,3 +295,202 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
     return entityFound;
 }
 
+static void strToLower(char *dst, const char *src, int maxLen) {
+    int i;
+    for (i = 0; i < maxLen - 1 && src[i] != '\0'; i++)
+        dst[i] = (char)tolower((unsigned char)src[i]);
+    dst[i] = '\0';
+}
+
+int defaultLengthForType(AttributeType type) {
+    switch (type) {
+        case Integer:   return 4;
+        case Decimal:   return 8;
+        case Character: return 1;
+        case String:    return MAX_CHARS;
+        default:        return 0;
+    }
+}
+
+static int validateAttributeLength(AttributeType type, int length) {
+    switch (type) {
+        case Integer:   return (length == 4);
+        case Decimal:   return (length == 8);
+        case Character: return (length == 1);
+        case String:    return (length > 0 && length <= MAX_CHARS);
+        default:        return 0;
+    }
+}
+
+long findEntity(FILE *dataDictionary, Entity *entity) {
+    long currentEntityDir = NULL_POINTER;
+    int  entityFound      = 0;
+ 
+    fseek(dataDictionary, MAIN_DATA_DICTIONARY_HEADER, SEEK_SET);
+    if (fread(&currentEntityDir, sizeof(long), 1, dataDictionary) != 1)
+        return NULL_POINTER;
+ 
+    while (currentEntityDir != NULL_POINTER && !entityFound) {
+        Entity currentEntity;
+ 
+        fseek(dataDictionary, currentEntityDir, SEEK_SET);
+        if (fread(&currentEntity, sizeof(Entity), 1, dataDictionary) != 1)
+            return NULL_POINTER;
+ 
+        if (strcmp(entity->name, currentEntity.name) == 0) {
+            entity->dataPointer       = currentEntity.dataPointer;
+            entity->attributesPointer = currentEntity.attributesPointer;
+            entity->nextEntity        = currentEntity.nextEntity;
+            entityFound = 1;
+        } else {
+            currentEntityDir = currentEntity.nextEntity;
+        }
+    }
+ 
+    return entityFound ? currentEntityDir : NULL_POINTER;
+}
+
+long appendAttribute(Attribute attribute, FILE *dataDictionary) {
+    if (fseek(dataDictionary, 0, SEEK_END) != 0) {
+        printf("Error: No se pudo posicionar al final del archivo.\n");
+        return NULL_POINTER;
+    }
+ 
+    long offset = ftell(dataDictionary);
+    if (offset == -1) {
+        printf("Error: No se pudo obtener la posición final del archivo.\n");
+        return NULL_POINTER;
+    }
+ 
+    if (fwrite(&attribute, sizeof(Attribute), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo escribir el atributo en el archivo.\n");
+        return NULL_POINTER;
+    }
+ 
+    return offset;
+}
+
+int createAttribute(FILE *dataDictionary, long attributesHeader,
+                    Attribute attribute) {
+ 
+    if (attribute.name[0] == '\0') {
+        printf("Error: El nombre del atributo no puede estar vacío.\n");
+        return 0;
+    }
+ 
+    if (!validateAttributeLength(attribute.type, attribute.length)) {
+        printf("Error: Longitud %d no válida para el tipo elegido.\n",
+               attribute.length);
+        return 0;
+    }
+ 
+    long currentAttributeDir = NULL_POINTER;
+    long currentAttributePtr = attributesHeader;
+    int  sortingCriteriaMet  = 0;
+ 
+    char newNameLower[MAX_CHARS];
+    strToLower(newNameLower, attribute.name, MAX_CHARS);
+
+    fseek(dataDictionary, currentAttributePtr, SEEK_SET);
+    if (fread(&currentAttributeDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la cabecera de atributos.\n");
+        return 0;
+    }
+ 
+    while (currentAttributeDir != NULL_POINTER && !sortingCriteriaMet) {
+        Attribute currentAttribute;
+ 
+        fseek(dataDictionary, currentAttributeDir, SEEK_SET);
+        if (fread(&currentAttribute, sizeof(Attribute), 1, dataDictionary) != 1) {
+            printf("Error: Fallo al leer atributo en offset %ld.\n",
+                   currentAttributeDir);
+            return 0;
+        }
+
+        char existingLower[MAX_CHARS];
+        strToLower(existingLower, currentAttribute.name, MAX_CHARS);
+        if (strcmp(newNameLower, existingLower) == 0) {
+            printf("Error: Ya existe un atributo llamado '%s' en esta entidad.\n",
+                   currentAttribute.name);
+            return 0;
+        }
+ 
+        if (attribute.isPrimaryKey == 'Y' && currentAttribute.isPrimaryKey == 'Y') {
+            printf("Error: Ya existe una llave primaria ('%s') en esta entidad.\n",
+                   currentAttribute.name);
+            printf("Solo se permite una Primary Key por entidad.\n");
+            return 0;
+        }
+ 
+        if (strcmp(newNameLower, existingLower) < 0) {
+            sortingCriteriaMet = 1;
+        } else {
+            currentAttributePtr = currentAttributeDir
+                                  + (long)sizeof(Attribute)
+                                  - (long)sizeof(long);
+            currentAttributeDir = currentAttribute.nextAttribute;
+        }
+    }
+ 
+    long attributeDir = appendAttribute(attribute, dataDictionary);
+    if (attributeDir == NULL_POINTER)
+        return 0;
+
+    fseek(dataDictionary, currentAttributePtr, SEEK_SET);
+    if (fwrite(&attributeDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo actualizar el enlace al nodo anterior.\n");
+        return 0;
+    }
+ 
+    long nextPtr = attributeDir + (long)sizeof(Attribute) - (long)sizeof(long);
+    fseek(dataDictionary, nextPtr, SEEK_SET);
+    if (fwrite(&currentAttributeDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo actualizar el enlace al nodo siguiente.\n");
+        return 0;
+    }
+ 
+    printf("Atributo '%s' insertado correctamente.\n", attribute.name);
+    return 1;
+}
+
+void printAttributes(FILE *dataDictionary, long attributesHeader) {
+    long currentDir;
+ 
+    fseek(dataDictionary, attributesHeader, SEEK_SET);
+    if (fread(&currentDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la cabecera de atributos.\n");
+        return;
+    }
+ 
+    if (currentDir == NULL_POINTER) {
+        printf("Esta entidad no tiene atributos registrados.\n");
+        return;
+    }
+
+    const char *tipos[] = {"Integer", "Decimal", "Character", "String"};
+    printf("\n%-20s %-12s %-8s %-5s\n",
+           "Atributo", "Tipo", "Length", "PK");
+    printf("%-20s %-12s %-8s %-5s\n",
+           "────────────────────", "────────────", "────────", "─────");
+ 
+    int count = 0;
+    while (currentDir != NULL_POINTER) {
+        Attribute current;
+ 
+        fseek(dataDictionary, currentDir, SEEK_SET);
+        if (fread(&current, sizeof(Attribute), 1, dataDictionary) != 1) {
+            printf("Error: Fallo al leer atributo en offset %ld.\n", currentDir);
+            return;
+        }
+ 
+        printf("%-20s %-12s %-8d %-5c\n",
+               current.name,
+               tipos[current.type],
+               current.length,
+               current.isPrimaryKey);
+ 
+        currentDir = current.nextAttribute;
+        count++;
+    }
+    printf("\nTotal de atributos: %d\n", count);
+}
