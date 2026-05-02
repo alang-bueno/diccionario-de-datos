@@ -26,7 +26,8 @@ typedef enum {
 typedef enum {
     ATTRIBUTE_MENU_EXIT  = 0,
     INSERT_ATTRIBUTE     = 1,
-    LIST_ATTRIBUTES      = 2
+    LIST_ATTRIBUTES      = 2,
+    DELETE_ATTRIBUTE     = 3
 } AttributeMenuChoice;
 
 typedef enum {
@@ -60,5 +61,6 @@ long  findEntity      (FILE *dataDictionary, Entity *entity);
 long  appendAttribute (Attribute attribute,  FILE *dataDictionary);
 int   createAttribute (FILE *dataDictionary, long attributesHeader, Attribute attribute);
 void  printAttributes (FILE *dataDictionary, long attributesHeader);
+int   removeAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
 
 #endif 

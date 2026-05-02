@@ -269,9 +269,7 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
             }
             entityFound = 1;
         } else {
-            currentEntityPtr = currentEntityDir
-                               + (long)sizeof(Entity)
-                               - (long)sizeof(long);
+            currentEntityPtr = currentEntityDir + (long)sizeof(Entity) - (long)sizeof(long);
             currentEntityDir = currentEntity.nextEntity;
         }
     }
@@ -425,9 +423,7 @@ int createAttribute(FILE *dataDictionary, long attributesHeader,
         if (strcmp(newNameLower, existingLower) < 0) {
             sortingCriteriaMet = 1;
         } else {
-            currentAttributePtr = currentAttributeDir
-                                  + (long)sizeof(Attribute)
-                                  - (long)sizeof(long);
+            currentAttributePtr = currentAttributeDir + (long)sizeof(Attribute) - (long)sizeof(long);
             currentAttributeDir = currentAttribute.nextAttribute;
         }
     }
@@ -493,4 +489,84 @@ void printAttributes(FILE *dataDictionary, long attributesHeader) {
         count++;
     }
     printf("\nTotal de atributos: %d\n", count);
+}
+
+int removeAttribute(FILE *dataDictionary, long attributesHeader, const char *attributeName) {
+    if (attributeName == NULL || attributeName[0] == '\0') {
+        printf("Error: El nombre del atributo no puede estar vacío.\n");
+        return 0;
+    }
+ 
+    long currentAttributeDir = NULL_POINTER;
+    long currentAttributePtr = attributesHeader;
+    int  attributeFound      = 0;
+ 
+    fseek(dataDictionary, currentAttributePtr, SEEK_SET);
+    if (fread(&currentAttributeDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la cabecera de atributos.\n");
+        return 0;
+    }
+ 
+    char searchLower[MAX_CHARS];
+    strToLower(searchLower, attributeName, MAX_CHARS);
+ 
+    while (currentAttributeDir != NULL_POINTER && !attributeFound) {
+        Attribute currentAttribute;
+ 
+        fseek(dataDictionary, currentAttributeDir, SEEK_SET);
+        if (fread(&currentAttribute, sizeof(Attribute), 1, dataDictionary) != 1) {
+            printf("Error: Fallo al leer atributo en offset %ld.\n",
+                   currentAttributeDir);
+            return 0;
+        }
+ 
+        char existingLower[MAX_CHARS];
+        strToLower(existingLower, currentAttribute.name, MAX_CHARS);
+ 
+        if (strcmp(searchLower, existingLower) == 0) {
+            printf("¿Seguro que deseas eliminar el atributo '%s'? (s/n): ",
+                   currentAttribute.name);
+            char respuesta;
+            scanf(" %c", &respuesta);
+ 
+            if (respuesta != 's' && respuesta != 'S') {
+                printf("Operación cancelada.\n");
+                return 0;
+            }
+ 
+            printf("\nEstado ANTES de eliminar:\n");
+            printAttributes(dataDictionary, attributesHeader);
+ 
+            fseek(dataDictionary, currentAttributePtr, SEEK_SET);
+            if (fwrite(&currentAttribute.nextAttribute, sizeof(long), 1, dataDictionary) != 1) {
+                printf("Error: No se pudo actualizar el puntero anterior.\n");
+                return 0;
+            }
+ 
+            attributeFound = 1;
+ 
+        } else {
+            currentAttributePtr = currentAttributeDir + (long)sizeof(Attribute) - (long)sizeof(long);
+            currentAttributeDir = currentAttribute.nextAttribute;
+        }
+    }
+ 
+    if (attributeFound) {
+        printf("\nAtributo '%s' eliminado correctamente.\n", attributeName);
+        long firstAttr;
+        fseek(dataDictionary, attributesHeader, SEEK_SET);
+        fread(&firstAttr, sizeof(long), 1, dataDictionary);
+ 
+        if (firstAttr == NULL_POINTER) {
+            printf("La entidad ha quedado sin atributos.\n");
+        } else {
+            printf("\nEstado DESPUÉS de eliminar:\n");
+            printAttributes(dataDictionary, attributesHeader);
+        }
+    } else {
+        printf("Error: No se encontró el atributo '%s' en esta entidad.\n",
+               attributeName);
+    }
+ 
+    return attributeFound;
 }

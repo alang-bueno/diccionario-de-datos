@@ -35,6 +35,7 @@ void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
         printf("──────────────────────────────────────\n");
         printf("  [%d] Insertar atributo               \n", INSERT_ATTRIBUTE);
         printf("  [%d] Listar atributos                \n", LIST_ATTRIBUTES);
+        printf("  [%d] Eliminar atributo               \n", DELETE_ATTRIBUTE);
         printf("  [%d] Volver                          \n", ATTRIBUTE_MENU_EXIT);
         printf("Selecciona una opción: ");
  
@@ -70,6 +71,14 @@ void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
             case LIST_ATTRIBUTES:
                 printAttributes(file, attributesHeader);
                 break;
+
+            case DELETE_ATTRIBUTE: {
+                char attrName[MAX_CHARS];
+                printf("\nNombre del atributo a eliminar: ");
+                    scanf("%49s", attrName);
+                removeAttribute(file, attributesHeader, attrName);
+                break;
+            }
  
             case ATTRIBUTE_MENU_EXIT:
                 printf("Volviendo al menú de entidades...\n");
