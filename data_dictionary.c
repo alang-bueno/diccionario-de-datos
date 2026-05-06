@@ -1,6 +1,8 @@
 #include "data_dictionary.h"
 #include <ctype.h>
 
+static void strToLower(char *dst, const char *src, int maxLen);
+
 int createDataDictionary(const char *fileName) {
     if (fileName == NULL || fileName[0] == '\0') {
         printf("Error: El nombre del archivo no puede estar vacío.\n");
@@ -108,19 +110,23 @@ static int entityExists(FILE *dataDictionary, const char *entityName) {
     fseek(dataDictionary, 0, SEEK_SET);
     if (fread(&currentDir, sizeof(long), 1, dataDictionary) != 1)
         return 0;
- 
+
     while (currentDir != NULL_POINTER) {
         Entity current;
         fseek(dataDictionary, currentDir, SEEK_SET);
         if (fread(&current, sizeof(Entity), 1, dataDictionary) != 1)
             break;
- 
-        if (strcmp(entityName, current.name) == 0)
-            return 1;  
- 
+
+        char existingLower[MAX_CHARS];
+        char searchLower[MAX_CHARS];
+        strToLower(existingLower, current.name, MAX_CHARS);
+        strToLower(searchLower, entityName, MAX_CHARS);
+
+        if (strcmp(searchLower, existingLower) == 0)
+            return 1;
+
         currentDir = current.nextEntity;
     }
-
     return 0;
 }
 
@@ -159,10 +165,15 @@ int createEntity(FILE *dataDictionary, const char *entityName) {
             printf("Error: Fallo al leer una entidad existente.\n");
             return 0;
         }
- 
-        if (strcmp(entityName, currentEntity.name) < 0) {
+
+        char newLower[MAX_CHARS], existingLower[MAX_CHARS];
+        strToLower(newLower, entityName, MAX_CHARS);
+        strToLower(existingLower, currentEntity.name, MAX_CHARS);
+        if (strcmp(newLower, existingLower) < 0) {
             sortingCriteriaMet = 1;
-        } else {
+        }
+        else
+        {
             currentEntityPtr = currentEntityDir + (long)sizeof(Entity) - (long)sizeof(long);
             currentEntityDir = currentEntity.nextEntity;
         }
@@ -248,8 +259,11 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
                    currentEntityDir);
             return 0;
         }
- 
-        if (strcmp(entityName, currentEntity.name) == 0) {
+
+        char searchLower[MAX_CHARS], existingLower[MAX_CHARS];
+        strToLower(searchLower, entityName, MAX_CHARS);
+        strToLower(existingLower, currentEntity.name, MAX_CHARS);
+        if (strcmp(searchLower, existingLower) == 0) {
             printf("¿Seguro que deseas eliminar la entidad '%s'? (s/n): ",
                    entityName);
             char respuesta;
@@ -268,7 +282,9 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
                 return 0;
             }
             entityFound = 1;
-        } else {
+        }
+        else
+        {
             currentEntityPtr = currentEntityDir + (long)sizeof(Entity) - (long)sizeof(long);
             currentEntityDir = currentEntity.nextEntity;
         }
@@ -334,13 +350,18 @@ long findEntity(FILE *dataDictionary, Entity *entity) {
         fseek(dataDictionary, currentEntityDir, SEEK_SET);
         if (fread(&currentEntity, sizeof(Entity), 1, dataDictionary) != 1)
             return NULL_POINTER;
- 
-        if (strcmp(entity->name, currentEntity.name) == 0) {
+
+        char searchLower[MAX_CHARS], existingLower[MAX_CHARS];
+        strToLower(searchLower, entity->name, MAX_CHARS);
+        strToLower(existingLower, currentEntity.name, MAX_CHARS);
+        if (strcmp(searchLower, existingLower) == 0) {
             entity->dataPointer       = currentEntity.dataPointer;
             entity->attributesPointer = currentEntity.attributesPointer;
             entity->nextEntity        = currentEntity.nextEntity;
             entityFound = 1;
-        } else {
+        }
+        else
+        {
             currentEntityDir = currentEntity.nextEntity;
         }
     }
@@ -586,13 +607,19 @@ static int pkExists(FILE *dataDictionary, long dataRecordsHeader, DataRecord *ne
  
         fseek(dataDictionary, currentDir, SEEK_SET);
         fread(currentBlock, newRecord->dataLength, 1, dataDictionary);
- 
-        int equal = (memcmp(
-            (char *)currentBlock + newRecord->primaryKeyOffset,
-            (char *)newRecord->data + newRecord->primaryKeyOffset,
-            (size_t)newRecord->primaryKeyLength
-        ) == 0);
- 
+
+        char pkA[MAX_CHARS], pkB[MAX_CHARS];
+        memset(pkA, 0, MAX_CHARS);
+        memset(pkB, 0, MAX_CHARS);
+        memcpy(pkA, (char *)newRecord->data + newRecord->primaryKeyOffset, newRecord->primaryKeyLength);
+        memcpy(pkB, (char *)currentBlock + newRecord->primaryKeyOffset, newRecord->primaryKeyLength);
+
+        char pkALower[MAX_CHARS], pkBLower[MAX_CHARS];
+        strToLower(pkALower, pkA, MAX_CHARS);
+        strToLower(pkBLower, pkB, MAX_CHARS);
+
+        int equal = (strcmp(pkALower, pkBLower) == 0);
+
         long nextDir;
         memcpy(&nextDir, (char *)currentBlock + newRecord->dataLength - sizeof(long), sizeof(long));
         free(currentBlock);
