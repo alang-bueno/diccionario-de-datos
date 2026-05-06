@@ -25,6 +25,45 @@ static int askAttributeLength(AttributeType type) {
     scanf("%d", &length);
     return (length == 0) ? defaultLen : length;
 }
+
+void recordMenu(FILE *file, Entity *entity, long entityOffset) {
+    RecordMenuChoice opcion;
+    long dataRecordsHeader = entityOffset + (long)sizeof(entity->name);
+    long attributesHeader = entityOffset + (long)sizeof(entity->name) + (long)sizeof(entity->dataPointer);
+ 
+    do {
+        printf("   REGISTROS DE: %-21s│\n", entity->name);
+        printf("  [%d] Insertar registro               \n", INSERT_RECORD);
+        printf("  [%d] Listar registros                \n", LIST_RECORDS);
+        printf("  [%d] Volver                          \n", RECORD_MENU_EXIT);
+        printf("Selecciona una opción: ");
+ 
+        int raw;
+        scanf("%d", &raw);
+        opcion = (RecordMenuChoice)raw;
+ 
+        switch (opcion) {
+ 
+            case INSERT_RECORD:
+                printf("\n--- Ingresa los valores del nuevo registro ---\n");
+                createDataRecord(file, attributesHeader, dataRecordsHeader);
+                break;
+ 
+            case LIST_RECORDS:
+                printDataRecords(file, attributesHeader, dataRecordsHeader);
+                break;
+ 
+            case RECORD_MENU_EXIT:
+                printf("Volviendo al menú de entidades...\n");
+                break;
+ 
+            default:
+                printf("Opción no válida.\n");
+                break;
+        }
+ 
+    } while (opcion != RECORD_MENU_EXIT);
+}
  
 void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
     AttributeMenuChoice opcion;                                  
@@ -102,6 +141,7 @@ void entityMenu(FILE *file) {
         printf("  [%d] Listar entidades                 \n", LIST_ENTITIES);
         printf("  [%d] Eliminar entidad                 \n", DELETE_ENTITY);
         printf("  [%d] Gestionar atributos              \n", MANAGE_ATTRIBUTES);
+        printf("  [%d] Gestionar registros              \n", MANAGE_RECORDS);
         printf("  [%d] Volver al menú principal         \n", ENTITY_MENU_EXIT);
         printf("Selecciona una opción: ");
  
@@ -144,6 +184,24 @@ void entityMenu(FILE *file) {
                 }
                 break;
             }
+
+             case MANAGE_RECORDS: {
+                printf("\nNombre de la entidad: ");
+                scanf("%49s", entityName);
+ 
+                Entity entity;
+                memset(&entity, 0, sizeof(Entity));
+                strcpy(entity.name, entityName);
+ 
+                long offset = findEntity(file, &entity);
+                if (offset == NULL_POINTER) {
+                    printf("Error: No se encontró la entidad '%s'.\n",
+                           entityName);
+                } else {
+                    recordMenu(file, &entity, offset);
+                }
+                break;
+            }
  
             case ENTITY_MENU_EXIT:
                 printf("Volviendo al menú principal...\n");
@@ -163,7 +221,7 @@ int main() {
     char fileName[MAX_CHARS];
     FILE *file = NULL;
  
-    printf("║     DICCIONARIO DE DATOS EN C        ║\n");
+    printf("║     DICCIONARIO DE DATOS        ║\n");
  
     do {
         printf("  [%d] Crear diccionario                \n", CREATE_DATA_DICTIONARY);

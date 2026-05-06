@@ -21,6 +21,7 @@ typedef enum {
     LIST_ENTITIES       = 2,
     DELETE_ENTITY       = 3,
     MANAGE_ATTRIBUTES = 4,
+    MANAGE_RECORDS    = 5
 } EntityMenuChoice;
 
 typedef enum {
@@ -29,6 +30,12 @@ typedef enum {
     LIST_ATTRIBUTES      = 2,
     DELETE_ATTRIBUTE     = 3
 } AttributeMenuChoice;
+
+typedef enum {
+    RECORD_MENU_EXIT = 0,
+    INSERT_RECORD    = 1,
+    LIST_RECORDS     = 2
+} RecordMenuChoice;
 
 typedef enum {
     Integer   = 0,
@@ -52,15 +59,26 @@ typedef struct {
     long nextAttribute;
 } Attribute;
 
-int  createDataDictionary(const char *fileName);
-FILE *openDataDictionary(const char *fileName);
-int   createEntity(FILE *dataDictionary, const char *entityName);
-void  printEntities(FILE *dataDictionary);
-int   removeEntity(FILE *dataDictionary, const char *entityName);
-long  findEntity      (FILE *dataDictionary, Entity *entity);
-long  appendAttribute (Attribute attribute,  FILE *dataDictionary);
-int   createAttribute (FILE *dataDictionary, long attributesHeader, Attribute attribute);
-void  printAttributes (FILE *dataDictionary, long attributesHeader);
-int   removeAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
+typedef struct {
+    void *data;             
+    long  primaryKeyOffset; 
+    int   primaryKeyLength; 
+    int   dataLength;       
+} DataRecord;
+
+int createDataDictionary (const char *fileName);
+FILE *openDataDictionary (const char *fileName);
+int createEntity (FILE *dataDictionary, const char *entityName);
+void printEntities (FILE *dataDictionary);
+int removeEntity (FILE *dataDictionary, const char *entityName);
+long findEntity (FILE *dataDictionary, Entity *entity);
+long appendAttribute (Attribute attribute,  FILE *dataDictionary);
+int createAttribute (FILE *dataDictionary, long attributesHeader, Attribute attribute);
+void printAttributes (FILE *dataDictionary, long attributesHeader);
+int removeAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
+DataRecord generateDataRecord (FILE *dataDictionary, long attributesHeader);
+long appendDataRecord (FILE *dataDictionary, DataRecord dataRecord);
+int createDataRecord (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
+void printDataRecords (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 
 #endif 
