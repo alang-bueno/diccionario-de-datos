@@ -80,5 +80,6 @@ DataRecord generateDataRecord (FILE *dataDictionary, long attributesHeader);
 long appendDataRecord (FILE *dataDictionary, DataRecord dataRecord);
 int createDataRecord (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 void printDataRecords (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
+int hasPrimaryKey   (FILE *dataDictionary, long attributesHeader);
 
 #endif 

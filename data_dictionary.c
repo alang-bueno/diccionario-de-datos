@@ -389,6 +389,24 @@ long appendAttribute(Attribute attribute, FILE *dataDictionary) {
     return offset;
 }
 
+int hasPrimaryKey(FILE *dataDictionary, long attributesHeader) {
+    long currentDir;
+    fseek(dataDictionary, attributesHeader, SEEK_SET);
+    if (fread(&currentDir, sizeof(long), 1, dataDictionary) != 1)
+        return 0;
+
+    while (currentDir != NULL_POINTER) {
+        Attribute current;
+        fseek(dataDictionary, currentDir, SEEK_SET);
+        if (fread(&current, sizeof(Attribute), 1, dataDictionary) != 1)
+            break;
+        if (current.isPrimaryKey == 'Y')
+            return 1;
+        currentDir = current.nextAttribute;
+    }
+    return 0;
+}
+
 int createAttribute(FILE *dataDictionary, long attributesHeader,
                     Attribute attribute) {
  

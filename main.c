@@ -13,17 +13,14 @@ static AttributeType askAttributeType(void) {
 }
  
 static int askAttributeLength(AttributeType type) {
+    if (type == Integer)   return 4;
+    if (type == Decimal)   return 8;
+    if (type == Character) return 1;
+
     int length;
-    int defaultLen;
-    switch (type) {
-        case Integer:   defaultLen = 4;        break;
-        case Decimal:   defaultLen = 8;        break;
-        case Character: defaultLen = 1;        break;
-        default:        defaultLen = MAX_CHARS; break;
-    }
-    printf("  Length (0 = usar valor por defecto %d): ", defaultLen);
+    printf("  Length (máximo %d, 0 = usar %d): ", MAX_CHARS, MAX_CHARS);
     scanf("%d", &length);
-    return (length == 0) ? defaultLen : length;
+    return (length <= 0 || length > MAX_CHARS) ? MAX_CHARS : length;
 }
 
 void recordMenu(FILE *file, Entity *entity, long entityOffset) {
@@ -83,30 +80,35 @@ void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
         opcion = (AttributeMenuChoice)raw;
  
         switch (opcion) {
- 
-            case INSERT_ATTRIBUTE: {
-                Attribute attr;
-                memset(&attr, 0, sizeof(Attribute));
-                attr.nextAttribute = NULL_POINTER;
- 
-                printf("\n  Nombre del atributo: ");
-                scanf("%49s", attr.name);
- 
-                attr.type   = askAttributeType();
-                attr.length = askAttributeLength(attr.type);
- 
+
+        case INSERT_ATTRIBUTE: {
+            Attribute attr;
+            memset(&attr, 0, sizeof(Attribute));
+            attr.nextAttribute = NULL_POINTER;
+
+            printf("\n  Nombre del atributo: ");
+            scanf("%49s", attr.name);
+
+            attr.type = askAttributeType();
+            attr.length = askAttributeLength(attr.type);
+
+            if (hasPrimaryKey(file, attributesHeader)) {
+                attr.isPrimaryKey = 'N';
+            }
+            else {
                 char pk;
                 printf("  ¿Es llave primaria? (Y/N): ");
                 scanf(" %c", &pk);
                 attr.isPrimaryKey = (pk == 'y' || pk == 'Y') ? 'Y' : 'N';
- 
-                if (createAttribute(file, attributesHeader, attr)) {
-                    fseek(file, attributesHeader, SEEK_SET);
-                    fread(&entity->attributesPointer, sizeof(long), 1, file);
-                }
-                break;
             }
- 
+
+            if (createAttribute(file, attributesHeader, attr)) {
+                fseek(file, attributesHeader, SEEK_SET);
+                fread(&entity->attributesPointer, sizeof(long), 1, file);
+            }
+            break;
+        }
+
             case LIST_ATTRIBUTES:
                 printAttributes(file, attributesHeader);
                 break;
