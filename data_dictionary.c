@@ -316,15 +316,6 @@ static void strToLower(char *dst, const char *src, int maxLen) {
     dst[i] = '\0';
 }
 
-int defaultLengthForType(AttributeType type) {
-    switch (type) {
-        case Integer:   return 4;
-        case Decimal:   return 8;
-        case Character: return 1;
-        case String:    return MAX_CHARS;
-        default:        return 0;
-    }
-}
 
 static int validateAttributeLength(AttributeType type, int length) {
     switch (type) {
@@ -626,17 +617,9 @@ static int pkExists(FILE *dataDictionary, long dataRecordsHeader, DataRecord *ne
         fseek(dataDictionary, currentDir, SEEK_SET);
         fread(currentBlock, newRecord->dataLength, 1, dataDictionary);
 
-        char pkA[MAX_CHARS], pkB[MAX_CHARS];
-        memset(pkA, 0, MAX_CHARS);
-        memset(pkB, 0, MAX_CHARS);
-        memcpy(pkA, (char *)newRecord->data + newRecord->primaryKeyOffset, newRecord->primaryKeyLength);
-        memcpy(pkB, (char *)currentBlock + newRecord->primaryKeyOffset, newRecord->primaryKeyLength);
-
-        char pkALower[MAX_CHARS], pkBLower[MAX_CHARS];
-        strToLower(pkALower, pkA, MAX_CHARS);
-        strToLower(pkBLower, pkB, MAX_CHARS);
-
-        int equal = (strcmp(pkALower, pkBLower) == 0);
+        int equal = (memcmp((char *)newRecord->data + newRecord->primaryKeyOffset,
+                            (char *)currentBlock  + newRecord->primaryKeyOffset,
+                            (size_t)newRecord->primaryKeyLength) == 0);
 
         long nextDir;
         memcpy(&nextDir, (char *)currentBlock + newRecord->dataLength - sizeof(long), sizeof(long));
@@ -659,10 +642,10 @@ static int comparePK(DataRecord *newRec, void *existingBlock) {
         memcpy(&b, exPK,  sizeof(int));
         return a - b;
     }
-    if (newRec->primaryKeyLength == sizeof(float)) {
-        float a, b;
-        memcpy(&a, newPK, sizeof(float));
-        memcpy(&b, exPK,  sizeof(float));
+    if (newRec->primaryKeyLength == sizeof(double)) {
+        double a, b;
+        memcpy(&a, newPK, sizeof(double));
+        memcpy(&b, exPK,  sizeof(double));
         return (a > b) - (a < b);
     }
     return memcmp(newPK, exPK, (size_t)newRec->primaryKeyLength);
@@ -706,19 +689,19 @@ DataRecord generateDataRecord(FILE *dataDictionary, long attributesHeader) {
             }
  
             case Decimal: {
-                float *floatData = (float *)malloc(sizeof(float));
+                double *doubleData = (double *)malloc(sizeof(double));
                 printf("  Valor para '%s' (Decimal, %d bytes): ", currentAttribute.name, currentAttribute.length);
-                scanf("%f", floatData);
+                scanf("%lf", doubleData);
                 while (getchar() != '\n');
- 
-                newDataRecord.data = realloc(newDataRecord.data, newDataRecord.dataLength + sizeof(float));
-                memcpy((char *)newDataRecord.data + newDataRecord.dataLength, floatData, sizeof(float));
- 
+
+                newDataRecord.data = realloc(newDataRecord.data, newDataRecord.dataLength + sizeof(double));
+                memcpy((char *)newDataRecord.data + newDataRecord.dataLength, doubleData, sizeof(double));
+
                 if (currentAttribute.isPrimaryKey == 'Y') {
                     newDataRecord.primaryKeyOffset = newDataRecord.dataLength;
-                    newDataRecord.primaryKeyLength = sizeof(float);
+                    newDataRecord.primaryKeyLength = sizeof(double);
                 }
-                free(floatData);
+                free(doubleData);
                 newDataRecord.dataLength += currentAttribute.length;
                 break;
             }
@@ -916,8 +899,8 @@ void printDataRecords(FILE *dataDictionary, long attributesHeader, long dataReco
                     break;
                 }
                 case Decimal: {
-                    float val;
-                    memcpy(&val, (char *)block + offset, sizeof(float));
+                    double val;
+                    memcpy(&val, (char *)block + offset, sizeof(double));
                     printf("%-20.2f ", val);
                     break;
                 }
@@ -1181,12 +1164,12 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
                 break;
             }
             case Decimal: {
-                float val;
+                double val;
                 printf("  '%s' (Decimal) [Enter para mantener valor actual]: ",
                        attrs[i].name);
-                scanf("%f", &val);
+                scanf("%lf", &val);
                 while (getchar() != '\n');
-                memcpy((char *)newBlock + offset, &val, sizeof(float));
+                memcpy((char *)newBlock + offset, &val, sizeof(double));
                 break;
             }
             case Character: {

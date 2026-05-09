@@ -25,8 +25,8 @@ static int askAttributeLength(AttributeType type) {
 
 void recordMenu(FILE *file, Entity *entity, long entityOffset) {
     RecordMenuChoice opcion;
-    long dataRecordsHeader = entityOffset + (long)sizeof(entity->name);
-    long attributesHeader = entityOffset + (long)sizeof(entity->name) + (long)sizeof(entity->dataPointer);
+    long dataRecordsHeader = entityOffset + (long)offsetof(Entity, dataPointer);
+    long attributesHeader  = entityOffset + (long)offsetof(Entity, attributesPointer);
  
     do {
         printf("   REGISTROS DE: %-21s│\n", entity->name);
@@ -70,7 +70,7 @@ void recordMenu(FILE *file, Entity *entity, long entityOffset) {
  
 void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
     AttributeMenuChoice opcion;                                  
-    long attributesHeader = entityOffset + (long)sizeof(entity->name) + (long)sizeof(entity->dataPointer);
+    long attributesHeader = entityOffset + (long)offsetof(Entity, attributesPointer);
  
     do {
         printf("   ATRIBUTOS DE: %-21s│\n", entity->name);
@@ -156,10 +156,10 @@ void entityMenu(FILE *file) {
         printf("        GESTIÓN DE ENTIDADES           \n");
         printf("  [%d] Insertar entidad                 \n", INSERT_ENTITY);
         printf("  [%d] Listar entidades                 \n", LIST_ENTITIES);
-        printf("  [%d] Modificar entidad               \n", MODIFY_ENTITY);
         printf("  [%d] Eliminar entidad                 \n", DELETE_ENTITY);
         printf("  [%d] Gestionar atributos              \n", MANAGE_ATTRIBUTES);
         printf("  [%d] Gestionar registros              \n", MANAGE_RECORDS);
+        printf("  [%d] Modificar entidad               \n", MODIFY_ENTITY);
         printf("  [%d] Volver al menú principal         \n", ENTITY_MENU_EXIT);
         printf("Selecciona una opción: ");
  

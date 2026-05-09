@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 #define MAX_CHARS 50
 #define NULL_POINTER                -1L   
