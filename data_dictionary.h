@@ -21,20 +21,23 @@ typedef enum {
     LIST_ENTITIES       = 2,
     DELETE_ENTITY       = 3,
     MANAGE_ATTRIBUTES = 4,
-    MANAGE_RECORDS    = 5
+    MANAGE_RECORDS    = 5,
+    MODIFY_ENTITY     = 6
 } EntityMenuChoice;
 
 typedef enum {
     ATTRIBUTE_MENU_EXIT  = 0,
     INSERT_ATTRIBUTE     = 1,
     LIST_ATTRIBUTES      = 2,
-    DELETE_ATTRIBUTE     = 3
+    DELETE_ATTRIBUTE     = 3,
+    MODIFY_ATTRIBUTE    = 4
 } AttributeMenuChoice;
 
 typedef enum {
     RECORD_MENU_EXIT = 0,
     INSERT_RECORD    = 1,
-    LIST_RECORDS     = 2
+    LIST_RECORDS     = 2,
+    MODIFY_RECORD    = 3
 } RecordMenuChoice;
 
 typedef enum {
@@ -80,6 +83,9 @@ DataRecord generateDataRecord (FILE *dataDictionary, long attributesHeader);
 long appendDataRecord (FILE *dataDictionary, DataRecord dataRecord);
 int createDataRecord (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 void printDataRecords (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
-int hasPrimaryKey   (FILE *dataDictionary, long attributesHeader);
+int hasPrimaryKey (FILE *dataDictionary, long attributesHeader);
+int modifyEntity (FILE *dataDictionary, const char *entityName);
+int modifyAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
+int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 
 #endif 

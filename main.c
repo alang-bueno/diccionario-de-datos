@@ -32,6 +32,7 @@ void recordMenu(FILE *file, Entity *entity, long entityOffset) {
         printf("   REGISTROS DE: %-21s│\n", entity->name);
         printf("  [%d] Insertar registro               \n", INSERT_RECORD);
         printf("  [%d] Listar registros                \n", LIST_RECORDS);
+        printf("  [%d] Modificar registro              \n", MODIFY_RECORD);
         printf("  [%d] Volver                          \n", RECORD_MENU_EXIT);
         printf("Selecciona una opción: ");
  
@@ -49,7 +50,12 @@ void recordMenu(FILE *file, Entity *entity, long entityOffset) {
             case LIST_RECORDS:
                 printDataRecords(file, attributesHeader, dataRecordsHeader);
                 break;
- 
+
+            case MODIFY_RECORD:
+                printf("\n--- Modificar registro ---\n");
+                modifyDataRecord(file, attributesHeader, dataRecordsHeader);
+                break;
+
             case RECORD_MENU_EXIT:
                 printf("Volviendo al menú de entidades...\n");
                 break;
@@ -72,6 +78,7 @@ void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
         printf("  [%d] Insertar atributo               \n", INSERT_ATTRIBUTE);
         printf("  [%d] Listar atributos                \n", LIST_ATTRIBUTES);
         printf("  [%d] Eliminar atributo               \n", DELETE_ATTRIBUTE);
+        printf("  [%d] Modificar atributo              \n", MODIFY_ATTRIBUTE);
         printf("  [%d] Volver                          \n", ATTRIBUTE_MENU_EXIT);
         printf("Selecciona una opción: ");
  
@@ -120,7 +127,15 @@ void attributeMenu(FILE *file, Entity *entity, long entityOffset) {
                 removeAttribute(file, attributesHeader, attrName);
                 break;
             }
- 
+
+            case MODIFY_ATTRIBUTE: {
+                char attrName[MAX_CHARS];
+                printf("\nNombre del atributo a modificar: ");
+                scanf("%49s", attrName);
+                modifyAttribute(file, attributesHeader, attrName);
+                break;
+            }
+
             case ATTRIBUTE_MENU_EXIT:
                 printf("Volviendo al menú de entidades...\n");
                 break;
@@ -141,6 +156,7 @@ void entityMenu(FILE *file) {
         printf("        GESTIÓN DE ENTIDADES           \n");
         printf("  [%d] Insertar entidad                 \n", INSERT_ENTITY);
         printf("  [%d] Listar entidades                 \n", LIST_ENTITIES);
+        printf("  [%d] Modificar entidad               \n", MODIFY_ENTITY);
         printf("  [%d] Eliminar entidad                 \n", DELETE_ENTITY);
         printf("  [%d] Gestionar atributos              \n", MANAGE_ATTRIBUTES);
         printf("  [%d] Gestionar registros              \n", MANAGE_RECORDS);
@@ -208,7 +224,13 @@ void entityMenu(FILE *file) {
             case ENTITY_MENU_EXIT:
                 printf("Volviendo al menú principal...\n");
                 break;
- 
+
+            case MODIFY_ENTITY:
+                printf("\nNombre de la entidad a modificar: ");
+                scanf("%49s", entityName);
+                modifyEntity(file, entityName);
+                break;
+
             default:
                 printf("Opción no válida. Intenta de nuevo.\n");
                 break;
