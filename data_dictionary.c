@@ -130,6 +130,36 @@ static int entityExists(FILE *dataDictionary, const char *entityName) {
     return 0;
 }
 
+static int countEntities(FILE *dataDictionary) {
+    int count = 0;
+    long currentDir;
+    fseek(dataDictionary, MAIN_DATA_DICTIONARY_HEADER, SEEK_SET);
+    if (fread(&currentDir, sizeof(long), 1, dataDictionary) != 1) return 0;
+    while (currentDir != NULL_POINTER) {
+        Entity e;
+        fseek(dataDictionary, currentDir, SEEK_SET);
+        if (fread(&e, sizeof(Entity), 1, dataDictionary) != 1) break;
+        currentDir = e.nextEntity;
+        count++;
+    }
+    return count;
+}
+
+static int countAttributes(FILE *dataDictionary, long attributesHeader) {
+    int count = 0;
+    long currentDir;
+    fseek(dataDictionary, attributesHeader, SEEK_SET);
+    if (fread(&currentDir, sizeof(long), 1, dataDictionary) != 1) return 0;
+    while (currentDir != NULL_POINTER) {
+        Attribute a;
+        fseek(dataDictionary, currentDir, SEEK_SET);
+        if (fread(&a, sizeof(Attribute), 1, dataDictionary) != 1) break;
+        currentDir = a.nextAttribute;
+        count++;
+    }
+    return count;
+}
+
 int createEntity(FILE *dataDictionary, const char *entityName) {
     if (entityName == NULL || entityName[0] == '\0') {
         printf("Error: El nombre de la entidad no puede estar vacío.\n");
@@ -137,7 +167,11 @@ int createEntity(FILE *dataDictionary, const char *entityName) {
     }
     if (entityExists(dataDictionary, entityName)) {
         printf("Error: La entidad '%s' ya existe en el diccionario.\n", entityName);
-        return 0;
+        return DD_ERROR;
+    }
+    if (countEntities(dataDictionary) >= MAX_ENTITIES) {
+        printf("Error: Se alcanzó el límite máximo de %d entidades.\n", MAX_ENTITIES);
+        return DD_ERROR;
     }
     Entity newEntity;
     memset(&newEntity, 0, sizeof(Entity));
@@ -181,23 +215,23 @@ int createEntity(FILE *dataDictionary, const char *entityName) {
  
     long entityDir = appendEntity(newEntity, dataDictionary);
     if (entityDir == -1)
-        return 0;
- 
+        return DD_FATAL;
+
     fseek(dataDictionary, currentEntityPtr, SEEK_SET);
     if (fwrite(&entityDir, sizeof(long), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el enlace al nodo anterior.\n");
-        return 0;
+        return DD_FATAL;
     }
- 
+
     long nextPtr = entityDir + (long)sizeof(Entity) - (long)sizeof(long);
     fseek(dataDictionary, nextPtr, SEEK_SET);
     if (fwrite(&currentEntityDir, sizeof(long), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el enlace al nodo siguiente.\n");
-        return 0;
+        return DD_FATAL;
     }
- 
+
     printf("Entidad '%s' insertada correctamente.\n", entityName);
-    return 1;
+    return DD_SUCCESS;
 }
  
 void printEntities(FILE *dataDictionary) {
@@ -279,7 +313,7 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
             if (fwrite(&currentEntity.nextEntity, sizeof(long), 1,
                        dataDictionary) != 1) {
                 printf("Error: No se pudo actualizar el puntero anterior.\n");
-                return 0;
+                return DD_FATAL;
             }
             entityFound = 1;
         }
@@ -398,6 +432,14 @@ int hasPrimaryKey(FILE *dataDictionary, long attributesHeader) {
     return 0;
 }
 
+int hasAttributes(FILE *dataDictionary, long attributesHeader) {
+    long firstAttr;
+    fseek(dataDictionary, attributesHeader, SEEK_SET);
+    if (fread(&firstAttr, sizeof(long), 1, dataDictionary) != 1)
+        return 0;
+    return firstAttr != NULL_POINTER;
+}
+
 int createAttribute(FILE *dataDictionary, long attributesHeader,
                     Attribute attribute) {
  
@@ -409,9 +451,14 @@ int createAttribute(FILE *dataDictionary, long attributesHeader,
     if (!validateAttributeLength(attribute.type, attribute.length)) {
         printf("Error: Longitud %d no válida para el tipo elegido.\n",
                attribute.length);
-        return 0;
+        return DD_ERROR;
     }
- 
+    if (countAttributes(dataDictionary, attributesHeader) >= MAX_ATTRIBUTES_PER_ENTITY) {
+        printf("Error: Se alcanzó el límite máximo de %d atributos por entidad.\n",
+               MAX_ATTRIBUTES_PER_ENTITY);
+        return DD_ERROR;
+    }
+
     long currentAttributeDir = NULL_POINTER;
     long currentAttributePtr = attributesHeader;
     int  sortingCriteriaMet  = 0;
@@ -460,23 +507,23 @@ int createAttribute(FILE *dataDictionary, long attributesHeader,
  
     long attributeDir = appendAttribute(attribute, dataDictionary);
     if (attributeDir == NULL_POINTER)
-        return 0;
+        return DD_FATAL;
 
     fseek(dataDictionary, currentAttributePtr, SEEK_SET);
     if (fwrite(&attributeDir, sizeof(long), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el enlace al nodo anterior.\n");
-        return 0;
+        return DD_FATAL;
     }
- 
+
     long nextPtr = attributeDir + (long)sizeof(Attribute) - (long)sizeof(long);
     fseek(dataDictionary, nextPtr, SEEK_SET);
     if (fwrite(&currentAttributeDir, sizeof(long), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el enlace al nodo siguiente.\n");
-        return 0;
+        return DD_FATAL;
     }
- 
+
     printf("Atributo '%s' insertado correctamente.\n", attribute.name);
-    return 1;
+    return DD_SUCCESS;
 }
 
 void printAttributes(FILE *dataDictionary, long attributesHeader) {
@@ -570,9 +617,9 @@ int removeAttribute(FILE *dataDictionary, long attributesHeader, const char *att
             fseek(dataDictionary, currentAttributePtr, SEEK_SET);
             if (fwrite(&currentAttribute.nextAttribute, sizeof(long), 1, dataDictionary) != 1) {
                 printf("Error: No se pudo actualizar el puntero anterior.\n");
-                return 0;
+                return DD_FATAL;
             }
- 
+
             attributeFound = 1;
  
         } else {
@@ -819,27 +866,27 @@ int createDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
     long dataRecordDir = appendDataRecord(dataDictionary, newDataRecord);
     if (dataRecordDir == NULL_POINTER) {
         free(newDataRecord.data);
-        return 0;
+        return DD_FATAL;
     }
- 
+
     fseek(dataDictionary, currentDataRecordPtr, SEEK_SET);
     if (fwrite(&dataRecordDir, sizeof(long), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el enlace anterior.\n");
         free(newDataRecord.data);
-        return 0;
+        return DD_FATAL;
     }
- 
+
     long nextPtr = dataRecordDir + newDataRecord.dataLength - sizeof(long);
     fseek(dataDictionary, nextPtr, SEEK_SET);
     if (fwrite(&currentDataRecordDir, sizeof(long), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el enlace siguiente.\n");
         free(newDataRecord.data);
-        return 0;
+        return DD_FATAL;
     }
- 
+
     free(newDataRecord.data);
     printf("Registro insertado correctamente.\n");
-    return 1;
+    return DD_SUCCESS;
 }
 
 void printDataRecords(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader) {
@@ -989,12 +1036,12 @@ int modifyEntity(FILE *dataDictionary, const char *entityName) {
     fseek(dataDictionary, entityOffset, SEEK_SET);
     if (fwrite(&entity, sizeof(Entity), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar la entidad en disco.\n");
-        return 0;
+        return DD_FATAL;
     }
 
     printf("Entidad renombrada de '%s' a '%s' correctamente.\n",
            entityName, newName);
-    return 1;
+    return DD_SUCCESS;
 }
 
 int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *attributeName) {
@@ -1067,12 +1114,12 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
     fseek(dataDictionary, attrOffset, SEEK_SET);
     if (fwrite(&found, sizeof(Attribute), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el atributo en disco.\n");
-        return 0;
+        return DD_FATAL;
     }
 
     printf("Atributo renombrado de '%s' a '%s' correctamente.\n",
            attributeName, newName);
-    return 1;
+    return DD_SUCCESS;
 }
 
 int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader) {
@@ -1244,11 +1291,11 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
     if (fwrite(newBlock, dataLength, 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar el registro en disco.\n");
         free(block); free(newBlock);
-        return 0;
+        return DD_FATAL;
     }
 
     printf("Registro %d modificado correctamente.\n", target);
     free(block);
     free(newBlock);
-    return 1;
+    return DD_SUCCESS;
 }

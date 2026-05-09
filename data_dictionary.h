@@ -6,9 +6,16 @@
 #include <string.h>
 #include <stddef.h>
 
-#define MAX_CHARS 50
-#define NULL_POINTER                -1L   
-#define MAIN_DATA_DICTIONARY_HEADER  0L   
+#define MAX_CHARS                   50
+#define NULL_POINTER                -1L
+#define MAIN_DATA_DICTIONARY_HEADER  0L
+
+#define MAX_ENTITIES               100
+#define MAX_ATTRIBUTES_PER_ENTITY   50
+
+#define DD_SUCCESS  1
+#define DD_ERROR    0
+#define DD_FATAL   (-1)
 
 typedef enum {
     EXIT                  = 0,
@@ -84,7 +91,8 @@ DataRecord generateDataRecord (FILE *dataDictionary, long attributesHeader);
 long appendDataRecord (FILE *dataDictionary, DataRecord dataRecord);
 int createDataRecord (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 void printDataRecords (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
-int hasPrimaryKey (FILE *dataDictionary, long attributesHeader);
+int hasPrimaryKey  (FILE *dataDictionary, long attributesHeader);
+int hasAttributes  (FILE *dataDictionary, long attributesHeader);
 int modifyEntity (FILE *dataDictionary, const char *entityName);
 int modifyAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
 int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
