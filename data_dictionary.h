@@ -45,7 +45,8 @@ typedef enum {
     RECORD_MENU_EXIT = 0,
     INSERT_RECORD    = 1,
     LIST_RECORDS     = 2,
-    MODIFY_RECORD    = 3
+    MODIFY_RECORD    = 3,
+    DELETE_RECORD    = 4
 } RecordMenuChoice;
 
 typedef enum {
@@ -96,5 +97,6 @@ int hasAttributes  (FILE *dataDictionary, long attributesHeader);
 int modifyEntity (FILE *dataDictionary, const char *entityName);
 int modifyAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
 int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
+int removeDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 
 #endif 

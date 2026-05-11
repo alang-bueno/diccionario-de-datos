@@ -306,6 +306,50 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
             }
             printf("\nEstado ANTES de eliminar:\n");
             printEntities(dataDictionary);
+
+            int dataRecordLen = (int)sizeof(long);
+            {
+                long attrCur = currentEntity.attributesPointer;
+                while (attrCur != NULL_POINTER) {
+                    Attribute a;
+                    if (fseek(dataDictionary, attrCur, SEEK_SET) != 0) break;
+                    if (fread(&a, sizeof(Attribute), 1, dataDictionary) != 1) break;
+                    dataRecordLen += a.length;
+                    attrCur = a.nextAttribute;
+                }
+            }
+            {
+                long dataCur = currentEntity.dataPointer;
+                while (dataCur != NULL_POINTER) {
+                    long nextFieldOff = dataCur + dataRecordLen - (long)sizeof(long);
+                    long nextData = NULL_POINTER;
+                    if (fseek(dataDictionary, nextFieldOff, SEEK_SET) != 0) break;
+                    if (fread(&nextData, sizeof(long), 1, dataDictionary) != 1) break;
+                    long nullPtr = NULL_POINTER;
+                    fseek(dataDictionary, nextFieldOff, SEEK_SET);
+                    fwrite(&nullPtr, sizeof(long), 1, dataDictionary);
+                    dataCur = nextData;
+                }
+            }
+            {
+                long attrCur = currentEntity.attributesPointer;
+                while (attrCur != NULL_POINTER) {
+                    Attribute a;
+                    if (fseek(dataDictionary, attrCur, SEEK_SET) != 0) break;
+                    if (fread(&a, sizeof(Attribute), 1, dataDictionary) != 1) break;
+                    long nextAttr = a.nextAttribute;
+                    a.nextAttribute = NULL_POINTER;
+                    fseek(dataDictionary, attrCur, SEEK_SET);
+                    fwrite(&a, sizeof(Attribute), 1, dataDictionary);
+                    attrCur = nextAttr;
+                }
+            }
+            currentEntity.attributesPointer = NULL_POINTER;
+            currentEntity.dataPointer       = NULL_POINTER;
+            if (fseek(dataDictionary, currentEntityDir, SEEK_SET) != 0 ||
+                fwrite(&currentEntity, sizeof(Entity), 1, dataDictionary) != 1) {
+                printf("Advertencia: No se pudieron limpiar los punteros de la entidad.\n");
+            }
             fseek(dataDictionary, currentEntityPtr, SEEK_SET);
             if (fwrite(&currentEntity.nextEntity, sizeof(long), 1,
                        dataDictionary) != 1) {
@@ -1055,9 +1099,15 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
         return 0;
     }
 
+    const char *tipos[] = {"Integer", "Decimal", "Character", "String"};
+
+    printf("\nValores actuales del atributo '%s':\n", found.name);
+    printf("  Tipo:   %s\n", tipos[found.type]);
+    printf("  Length: %d\n", found.length);
+    printf("  PK:     %c\n", found.isPrimaryKey);
+
     char newName[MAX_CHARS];
-    printf("Nombre actual: %s\n", found.name);
-    printf("Nuevo nombre: ");
+    printf("\nNuevo nombre (mismo para no cambiar): ");
     scanf("%49s", newName);
 
     if (newName[0] == '\0') {
@@ -1067,29 +1117,106 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
 
     char newLower[MAX_CHARS];
     strToLower(newLower, newName, MAX_CHARS);
-
-    long checkDir;
-    fseek(dataDictionary, attributesHeader, SEEK_SET);
-    fread(&checkDir, sizeof(long), 1, dataDictionary);
-
-    while (checkDir != NULL_POINTER) {
-        Attribute check;
-        fseek(dataDictionary, checkDir, SEEK_SET);
-        fread(&check, sizeof(Attribute), 1, dataDictionary);
-
-        char checkLower[MAX_CHARS];
-        strToLower(checkLower, check.name, MAX_CHARS);
-
-        if (checkDir != attrOffset &&
-            strcmp(newLower, checkLower) == 0) {
-            printf("Error: Ya existe un atributo llamado '%s'.\n", newName);
-            return 0;
+    if (strcmp(newLower, searchLower) != 0) {
+        long checkDir;
+        fseek(dataDictionary, attributesHeader, SEEK_SET);
+        fread(&checkDir, sizeof(long), 1, dataDictionary);
+        while (checkDir != NULL_POINTER) {
+            Attribute check;
+            fseek(dataDictionary, checkDir, SEEK_SET);
+            fread(&check, sizeof(Attribute), 1, dataDictionary);
+            char checkLower[MAX_CHARS];
+            strToLower(checkLower, check.name, MAX_CHARS);
+            if (strcmp(newLower, checkLower) == 0) {
+                printf("Error: Ya existe un atributo llamado '%s'.\n", newName);
+                return 0;
+            }
+            checkDir = check.nextAttribute;
         }
-        checkDir = check.nextAttribute;
+    }
+
+    printf("\nTipo actual: %s\n", tipos[found.type]);
+    printf("Seleccione nuevo tipo (0 = mantener actual):\n");
+    printf("  1. Integer   (4 bytes fijos)\n");
+    printf("  2. Decimal   (8 bytes fijos)\n");
+    printf("  3. Character (1 byte fijo)\n");
+    printf("  4. String    (1-%d bytes)\n", MAX_CHARS);
+    printf("Opción: ");
+    int typeChoice;
+    scanf("%d", &typeChoice);
+
+    AttributeType newType   = found.type;
+    int           newLength = found.length;
+
+    if (typeChoice >= 1 && typeChoice <= 4) {
+        newType = (AttributeType)(typeChoice - 1);
+        switch (newType) {
+            case Integer:   newLength = 4; break;
+            case Decimal:   newLength = 8; break;
+            case Character: newLength = 1; break;
+            case String:
+                printf("Longitud del String (1-%d): ", MAX_CHARS);
+                scanf("%d", &newLength);
+                if (!validateAttributeLength(String, newLength)) {
+                    printf("Error: Longitud %d inválida para String (debe ser 1-%d).\n",
+                           newLength, MAX_CHARS);
+                    return 0;
+                }
+                break;
+        }
+    } else if (typeChoice == 0) {
+        if (found.type == String) {
+            printf("Longitud actual: %d. Nueva longitud (0 = mantener): ", found.length);
+            int lenInput;
+            scanf("%d", &lenInput);
+            if (lenInput != 0) {
+                if (!validateAttributeLength(String, lenInput)) {
+                    printf("Error: Longitud %d inválida para String (debe ser 1-%d).\n",
+                           lenInput, MAX_CHARS);
+                    return 0;
+                }
+                newLength = lenInput;
+            }
+        }
+    } else {
+        printf("Opción inválida. Tipo no modificado.\n");
+    }
+
+    printf("\n¿Es llave primaria? (Y/N) [actual: %c]: ", found.isPrimaryKey);
+    char pkChoice;
+    scanf(" %c", &pkChoice);
+
+    char newPK = found.isPrimaryKey;
+    if (pkChoice == 'Y' || pkChoice == 'y') {
+        if (found.isPrimaryKey != 'Y') {
+            long pkCheckDir;
+            fseek(dataDictionary, attributesHeader, SEEK_SET);
+            fread(&pkCheckDir, sizeof(long), 1, dataDictionary);
+            while (pkCheckDir != NULL_POINTER) {
+                Attribute pkCheck;
+                fseek(dataDictionary, pkCheckDir, SEEK_SET);
+                fread(&pkCheck, sizeof(Attribute), 1, dataDictionary);
+                if (pkCheckDir != attrOffset && pkCheck.isPrimaryKey == 'Y') {
+                    printf("Error: Ya existe una llave primaria ('%s') en esta entidad.\n",
+                           pkCheck.name);
+                    printf("Solo se permite una Primary Key por entidad.\n");
+                    return 0;
+                }
+                pkCheckDir = pkCheck.nextAttribute;
+            }
+        }
+        newPK = 'Y';
+    } else if (pkChoice == 'N' || pkChoice == 'n') {
+        newPK = 'N';
+    } else {
+        printf("Opción inválida. PK no modificada.\n");
     }
 
     memset(found.name, 0, MAX_CHARS);
     strncpy(found.name, newName, MAX_CHARS - 1);
+    found.type         = newType;
+    found.length       = newLength;
+    found.isPrimaryKey = newPK;
 
     fseek(dataDictionary, attrOffset, SEEK_SET);
     if (fwrite(&found, sizeof(Attribute), 1, dataDictionary) != 1) {
@@ -1097,8 +1224,7 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
         return DD_FATAL;
     }
 
-    printf("Atributo renombrado de '%s' a '%s' correctamente.\n",
-           attributeName, newName);
+    printf("Atributo modificado correctamente.\n");
     return DD_SUCCESS;
 }
 
@@ -1273,5 +1399,144 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
     printf("Registro %d modificado correctamente.\n", target);
     free(block);
     free(newBlock);
+    return DD_SUCCESS;
+}
+
+int removeDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader) {
+    Attribute attrs[64];
+    int attrCount = 0;
+    long attrDir;
+
+    fseek(dataDictionary, attributesHeader, SEEK_SET);
+    if (fread(&attrDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la cabecera de atributos.\n");
+        return 0;
+    }
+
+    while (attrDir != NULL_POINTER && attrCount < 64) {
+        fseek(dataDictionary, attrDir, SEEK_SET);
+        if (fread(&attrs[attrCount], sizeof(Attribute), 1, dataDictionary) != 1) break;
+        attrDir = attrs[attrCount].nextAttribute;
+        attrCount++;
+    }
+
+    if (attrCount == 0) {
+        printf("Error: Esta entidad no tiene atributos definidos.\n");
+        return 0;
+    }
+
+    int dataLength = 0;
+    for (int i = 0; i < attrCount; i++)
+        dataLength += attrs[i].length;
+    dataLength += (int)sizeof(long);
+
+    printf("\nRegistros actuales:\n");
+    printDataRecords(dataDictionary, attributesHeader, dataRecordsHeader);
+
+    long firstRecord;
+    fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+    if (fread(&firstRecord, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la cabecera de registros.\n");
+        return 0;
+    }
+    if (firstRecord == NULL_POINTER) {
+        printf("No hay registros para eliminar.\n");
+        return 0;
+    }
+
+    int target;
+    printf("\nNúmero de registro a eliminar: ");
+    if (scanf("%d", &target) != 1 || target < 1) {
+        printf("Error: Número de registro inválido.\n");
+        return 0;
+    }
+
+    long currentRecordPtr = dataRecordsHeader;
+    long currentRecordDir;
+    fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+    if (fread(&currentRecordDir, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer la lista de registros.\n");
+        return 0;
+    }
+
+    int count = 1;
+    int found = 0;
+    while (currentRecordDir != NULL_POINTER) {
+        if (count == target) {
+            found = 1;
+            break;
+        }
+        currentRecordPtr = currentRecordDir + dataLength - (long)sizeof(long);
+        void *tmp = malloc(dataLength);
+        if (!tmp) {
+            printf("Error: Memoria insuficiente.\n");
+            return DD_FATAL;
+        }
+        fseek(dataDictionary, currentRecordDir, SEEK_SET);
+        if (fread(tmp, dataLength, 1, dataDictionary) != 1) {
+            free(tmp);
+            printf("Error: Fallo al leer registro en offset %ld.\n", currentRecordDir);
+            return 0;
+        }
+        long nextDir;
+        memcpy(&nextDir, (char *)tmp + dataLength - sizeof(long), sizeof(long));
+        free(tmp);
+        currentRecordDir = nextDir;
+        count++;
+    }
+
+    if (!found) {
+        printf("Error: No existe el registro número %d.\n", target);
+        return 0;
+    }
+
+    void *block = malloc(dataLength);
+    if (!block) {
+        printf("Error: Memoria insuficiente.\n");
+        return DD_FATAL;
+    }
+    fseek(dataDictionary, currentRecordDir, SEEK_SET);
+    if (fread(block, dataLength, 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer el registro a eliminar.\n");
+        free(block);
+        return 0;
+    }
+    long nextRecord;
+    memcpy(&nextRecord, (char *)block + dataLength - sizeof(long), sizeof(long));
+    free(block);
+
+    printf("¿Seguro que deseas eliminar el registro %d? (s/n): ", target);
+    char respuesta;
+    scanf(" %c", &respuesta);
+    if (respuesta != 's' && respuesta != 'S') {
+        printf("Operación cancelada. No se eliminó ningún registro.\n");
+        return 0;
+    }
+
+    printf("\nEstado ANTES de eliminar:\n");
+    printDataRecords(dataDictionary, attributesHeader, dataRecordsHeader);
+
+    fseek(dataDictionary, currentRecordPtr, SEEK_SET);
+    if (fwrite(&nextRecord, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo actualizar el puntero anterior.\n");
+        return DD_FATAL;
+    }
+
+    long nullPtr = NULL_POINTER;
+    fseek(dataDictionary, currentRecordDir + dataLength - sizeof(long), SEEK_SET);
+    fwrite(&nullPtr, sizeof(long), 1, dataDictionary);
+
+    printf("\nRegistro %d eliminado correctamente.\n", target);
+
+    long firstRec;
+    fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+    fread(&firstRec, sizeof(long), 1, dataDictionary);
+    if (firstRec == NULL_POINTER) {
+        printf("No quedan registros en esta entidad.\n");
+    } else {
+        printf("\nEstado DESPUÉS de eliminar:\n");
+        printDataRecords(dataDictionary, attributesHeader, dataRecordsHeader);
+    }
+
     return DD_SUCCESS;
 }
