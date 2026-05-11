@@ -206,8 +206,7 @@ int createEntity(FILE *dataDictionary, const char *entityName) {
         if (strcmp(newLower, existingLower) < 0) {
             sortingCriteriaMet = 1;
         }
-        else
-        {
+        else {
             currentEntityPtr = currentEntityDir + (long)sizeof(Entity) - (long)sizeof(long);
             currentEntityDir = currentEntity.nextEntity;
         }
@@ -277,7 +276,7 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
  
     long currentEntityDir = NULL_POINTER;
     long currentEntityPtr = MAIN_DATA_DICTIONARY_HEADER;
-    int  entityFound      = 0;
+    int  entityFound = 0;
 
     fseek(dataDictionary, currentEntityPtr, SEEK_SET);
     if (fread(&currentEntityDir, sizeof(long), 1, dataDictionary) != 1) {
@@ -289,8 +288,7 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
         Entity currentEntity;
         fseek(dataDictionary, currentEntityDir, SEEK_SET);
         if (fread(&currentEntity, sizeof(Entity), 1, dataDictionary) != 1) {
-            printf("Error: Fallo al leer entidad en offset %ld.\n",
-                   currentEntityDir);
+            printf("Error: Fallo al leer entidad en offset %ld.\n", currentEntityDir);
             return 0;
         }
 
@@ -298,8 +296,7 @@ int removeEntity(FILE *dataDictionary, const char *entityName) {
         strToLower(searchLower, entityName, MAX_CHARS);
         strToLower(existingLower, currentEntity.name, MAX_CHARS);
         if (strcmp(searchLower, existingLower) == 0) {
-            printf("¿Seguro que deseas eliminar la entidad '%s'? (s/n): ",
-                   entityName);
+            printf("¿Seguro que deseas eliminar la entidad '%s'? (s/n): ", entityName);
             char respuesta;
             scanf(" %c", &respuesta);
  
@@ -363,7 +360,7 @@ static int validateAttributeLength(AttributeType type, int length) {
 
 long findEntity(FILE *dataDictionary, Entity *entity) {
     long currentEntityDir = NULL_POINTER;
-    int  entityFound      = 0;
+    int entityFound = 0;
  
     fseek(dataDictionary, MAIN_DATA_DICTIONARY_HEADER, SEEK_SET);
     if (fread(&currentEntityDir, sizeof(long), 1, dataDictionary) != 1)
@@ -380,13 +377,11 @@ long findEntity(FILE *dataDictionary, Entity *entity) {
         strToLower(searchLower, entity->name, MAX_CHARS);
         strToLower(existingLower, currentEntity.name, MAX_CHARS);
         if (strcmp(searchLower, existingLower) == 0) {
-            entity->dataPointer       = currentEntity.dataPointer;
+            entity->dataPointer = currentEntity.dataPointer;
             entity->attributesPointer = currentEntity.attributesPointer;
-            entity->nextEntity        = currentEntity.nextEntity;
+            entity->nextEntity = currentEntity.nextEntity;
             entityFound = 1;
-        }
-        else
-        {
+        } else {
             currentEntityDir = currentEntity.nextEntity;
         }
     }
@@ -440,8 +435,7 @@ int hasAttributes(FILE *dataDictionary, long attributesHeader) {
     return firstAttr != NULL_POINTER;
 }
 
-int createAttribute(FILE *dataDictionary, long attributesHeader,
-                    Attribute attribute) {
+int createAttribute(FILE *dataDictionary, long attributesHeader, Attribute attribute) {
  
     if (attribute.name[0] == '\0') {
         printf("Error: El nombre del atributo no puede estar vacío.\n");
@@ -449,13 +443,11 @@ int createAttribute(FILE *dataDictionary, long attributesHeader,
     }
  
     if (!validateAttributeLength(attribute.type, attribute.length)) {
-        printf("Error: Longitud %d no válida para el tipo elegido.\n",
-               attribute.length);
+        printf("Error: Longitud %d no válida para el tipo elegido.\n", attribute.length);
         return DD_ERROR;
     }
     if (countAttributes(dataDictionary, attributesHeader) >= MAX_ATTRIBUTES_PER_ENTITY) {
-        printf("Error: Se alcanzó el límite máximo de %d atributos por entidad.\n",
-               MAX_ATTRIBUTES_PER_ENTITY);
+        printf("Error: Se alcanzó el límite máximo de %d atributos por entidad.\n", MAX_ATTRIBUTES_PER_ENTITY);
         return DD_ERROR;
     }
 
@@ -477,22 +469,19 @@ int createAttribute(FILE *dataDictionary, long attributesHeader,
  
         fseek(dataDictionary, currentAttributeDir, SEEK_SET);
         if (fread(&currentAttribute, sizeof(Attribute), 1, dataDictionary) != 1) {
-            printf("Error: Fallo al leer atributo en offset %ld.\n",
-                   currentAttributeDir);
+            printf("Error: Fallo al leer atributo en offset %ld.\n", currentAttributeDir);
             return 0;
         }
 
         char existingLower[MAX_CHARS];
         strToLower(existingLower, currentAttribute.name, MAX_CHARS);
         if (strcmp(newNameLower, existingLower) == 0) {
-            printf("Error: Ya existe un atributo llamado '%s' en esta entidad.\n",
-                   currentAttribute.name);
+            printf("Error: Ya existe un atributo llamado '%s' en esta entidad.\n", currentAttribute.name);
             return 0;
         }
  
         if (attribute.isPrimaryKey == 'Y' && currentAttribute.isPrimaryKey == 'Y') {
-            printf("Error: Ya existe una llave primaria ('%s') en esta entidad.\n",
-                   currentAttribute.name);
+            printf("Error: Ya existe una llave primaria ('%s') en esta entidad.\n", currentAttribute.name);
             printf("Solo se permite una Primary Key por entidad.\n");
             return 0;
         }
@@ -541,8 +530,7 @@ void printAttributes(FILE *dataDictionary, long attributesHeader) {
     }
 
     const char *tipos[] = {"Integer", "Decimal", "Character", "String"};
-    printf("\n%-20s %-12s %-8s %-5s\n",
-           "Atributo", "Tipo", "Length", "PK");
+    printf("\n%-20s %-12s %-8s %-5s\n", "Atributo", "Tipo", "Length", "PK");
     printf("%-20s %-12s %-8s %-5s\n",
            "────────────────────", "────────────", "────────", "─────");
  
@@ -556,11 +544,7 @@ void printAttributes(FILE *dataDictionary, long attributesHeader) {
             return;
         }
  
-        printf("%-20s %-12s %-8d %-5c\n",
-               current.name,
-               tipos[current.type],
-               current.length,
-               current.isPrimaryKey);
+        printf("%-20s %-12s %-8d %-5c\n", current.name, tipos[current.type], current.length, current.isPrimaryKey);
  
         currentDir = current.nextAttribute;
         count++;
@@ -592,8 +576,7 @@ int removeAttribute(FILE *dataDictionary, long attributesHeader, const char *att
  
         fseek(dataDictionary, currentAttributeDir, SEEK_SET);
         if (fread(&currentAttribute, sizeof(Attribute), 1, dataDictionary) != 1) {
-            printf("Error: Fallo al leer atributo en offset %ld.\n",
-                   currentAttributeDir);
+            printf("Error: Fallo al leer atributo en offset %ld.\n", currentAttributeDir);
             return 0;
         }
  
@@ -601,8 +584,7 @@ int removeAttribute(FILE *dataDictionary, long attributesHeader, const char *att
         strToLower(existingLower, currentAttribute.name, MAX_CHARS);
  
         if (strcmp(searchLower, existingLower) == 0) {
-            printf("¿Seguro que deseas eliminar el atributo '%s'? (s/n): ",
-                   currentAttribute.name);
+            printf("¿Seguro que deseas eliminar el atributo '%s'? (s/n): ", currentAttribute.name);
             char respuesta;
             scanf(" %c", &respuesta);
  
@@ -664,9 +646,8 @@ static int pkExists(FILE *dataDictionary, long dataRecordsHeader, DataRecord *ne
         fseek(dataDictionary, currentDir, SEEK_SET);
         fread(currentBlock, newRecord->dataLength, 1, dataDictionary);
 
-        int equal = (memcmp((char *)newRecord->data + newRecord->primaryKeyOffset,
-                            (char *)currentBlock  + newRecord->primaryKeyOffset,
-                            (size_t)newRecord->primaryKeyLength) == 0);
+        int equal = (memcmp((char *)newRecord->data + newRecord->primaryKeyOffset, (char *)currentBlock  + newRecord->primaryKeyOffset, 
+                    (size_t)newRecord->primaryKeyLength) == 0);
 
         long nextDir;
         memcpy(&nextDir, (char *)currentBlock + newRecord->dataLength - sizeof(long), sizeof(long));
@@ -771,8 +752,7 @@ DataRecord generateDataRecord(FILE *dataDictionary, long attributesHeader) {
                 break;
             }
 
-            case String:
-            {
+            case String: {
                 char *stringData = (char *)malloc(currentAttribute.length + 1);
                 memset(stringData, 0, currentAttribute.length + 1);
                 printf("  Valor para '%s' (String, %d bytes): ", currentAttribute.name, currentAttribute.length);
@@ -782,7 +762,7 @@ DataRecord generateDataRecord(FILE *dataDictionary, long attributesHeader) {
                 newDataRecord.data = realloc(newDataRecord.data, newDataRecord.dataLength + currentAttribute.length);
                 memcpy((char *)newDataRecord.data + newDataRecord.dataLength, stringData, currentAttribute.length);
 
-                if (currentAttribute.isPrimaryKey == 'Y'){
+                if (currentAttribute.isPrimaryKey == 'Y') {
                     newDataRecord.primaryKeyOffset = newDataRecord.dataLength;
                     newDataRecord.primaryKeyLength = currentAttribute.length;
                 }
@@ -1000,7 +980,7 @@ int modifyEntity(FILE *dataDictionary, const char *entityName) {
 
         strToLower(existingLower, current.name, MAX_CHARS);
         if (strcmp(searchLower, existingLower) == 0) {
-            entity      = current;
+            entity = current;
             entityOffset = currentDir;
             break;
         }
@@ -1203,8 +1183,7 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
 
             case Integer: {
                 int val;
-                printf("  '%s' (Integer) [Enter para mantener valor actual]: ",
-                       attrs[i].name);
+                printf("  '%s' (Integer) [Enter para mantener valor actual]: ", attrs[i].name);
                 scanf("%d", &val);
                 while (getchar() != '\n');
                 memcpy((char *)newBlock + offset, &val, sizeof(int));
@@ -1212,8 +1191,7 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
             }
             case Decimal: {
                 double val;
-                printf("  '%s' (Decimal) [Enter para mantener valor actual]: ",
-                       attrs[i].name);
+                printf("  '%s' (Decimal) [Enter para mantener valor actual]: ", attrs[i].name);
                 scanf("%lf", &val);
                 while (getchar() != '\n');
                 memcpy((char *)newBlock + offset, &val, sizeof(double));
@@ -1272,9 +1250,7 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
                 fseek(dataDictionary, checkDir, SEEK_SET);
                 fread(tmp, dataLength, 1, dataDictionary);
 
-                if (memcmp((char *)tmp + pkOffset,
-                           (char *)newBlock + pkOffset,
-                           pkLength) == 0) {
+                if (memcmp((char *)tmp + pkOffset, (char *)newBlock + pkOffset, pkLength) == 0) {
                     printf("Error: Ya existe un registro con esa clave primaria.\n");
                     free(tmp); free(block); free(newBlock);
                     return 0;
