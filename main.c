@@ -50,6 +50,7 @@ void recordMenu(FILE **file, Entity *entity, long entityOffset) {
         printf("  [%d] Insertar registro               \n", INSERT_RECORD);
         printf("  [%d] Listar registros                \n", LIST_RECORDS);
         printf("  [%d] Modificar registro              \n", MODIFY_RECORD);
+        printf("  [%d] Eliminar registro               \n", DELETE_RECORD);
         printf("  [%d] Volver                          \n", RECORD_MENU_EXIT);
         printf("Selecciona una opción: ");
 
@@ -60,8 +61,7 @@ void recordMenu(FILE **file, Entity *entity, long entityOffset) {
             case INSERT_RECORD:
                 if (!hasAttributes(*file, attributesHeader)) {
                     printf("Error: '%s' no tiene atributos definidos.\n"
-                           "Define al menos un atributo antes de insertar registros.\n",
-                           entity->name);
+                           "Define al menos un atributo antes de insertar registros.\n", entity->name);
                     break;
                 }
                 printf("\n--- Ingresa los valores del nuevo registro ---\n");
@@ -83,6 +83,13 @@ void recordMenu(FILE **file, Entity *entity, long entityOffset) {
                 }
                 break;
 
+            case DELETE_RECORD:
+                if (removeDataRecord(*file, attributesHeader, dataRecordsHeader) == DD_FATAL) {
+                    closeDictionary(file);
+                    opcion = RECORD_MENU_EXIT;
+                }
+                break;
+
             case RECORD_MENU_EXIT:
                 printf("Volviendo al menú de entidades...\n");
                 break;
@@ -97,7 +104,8 @@ void recordMenu(FILE **file, Entity *entity, long entityOffset) {
 
 void attributeMenu(FILE **file, Entity *entity, long entityOffset) {
     AttributeMenuChoice opcion;
-    long attributesHeader = entityOffset + (long)offsetof(Entity, attributesPointer);
+    long attributesHeader  = entityOffset + (long)offsetof(Entity, attributesPointer);
+    long dataRecordsHeader = entityOffset + (long)offsetof(Entity, dataPointer);
 
     do {
         printf("   ATRIBUTOS DE: %-21s│\n", entity->name);
@@ -114,6 +122,11 @@ void attributeMenu(FILE **file, Entity *entity, long entityOffset) {
         switch (opcion) {
 
         case INSERT_ATTRIBUTE: {
+            if (hasDataRecords(*file, dataRecordsHeader)) {
+                printf("Error: La entidad '%s' tiene registros de datos.\n"
+                       "No se pueden agregar atributos mientras existan registros.\n", entity->name);
+                break;
+            }
             Attribute attr;
             memset(&attr, 0, sizeof(Attribute));
             attr.nextAttribute = NULL_POINTER;
@@ -149,6 +162,12 @@ void attributeMenu(FILE **file, Entity *entity, long entityOffset) {
                 break;
 
             case DELETE_ATTRIBUTE: {
+                if (hasDataRecords(*file, dataRecordsHeader)) {
+                    printf("Error: La entidad '%s' tiene registros de datos.\n"
+                           "No se pueden eliminar atributos mientras existan registros.\n",
+                           entity->name);
+                    break;
+                }
                 char attrName[MAX_CHARS];
                 printf("\nNombre del atributo a eliminar: ");
                 scanf("%49s", attrName);
@@ -160,6 +179,12 @@ void attributeMenu(FILE **file, Entity *entity, long entityOffset) {
             }
 
             case MODIFY_ATTRIBUTE: {
+                if (hasDataRecords(*file, dataRecordsHeader)) {
+                    printf("Error: La entidad '%s' tiene registros de datos.\n"
+                           "No se pueden modificar atributos mientras existan registros.\n",
+                           entity->name);
+                    break;
+                }
                 char attrName[MAX_CHARS];
                 printf("\nNombre del atributo a modificar: ");
                 scanf("%49s", attrName);

@@ -94,6 +94,7 @@ int createDataRecord (FILE *dataDictionary, long attributesHeader, long dataReco
 void printDataRecords (FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);
 int hasPrimaryKey  (FILE *dataDictionary, long attributesHeader);
 int hasAttributes  (FILE *dataDictionary, long attributesHeader);
+int hasDataRecords (FILE *dataDictionary, long dataRecordsHeader);
 int modifyEntity (FILE *dataDictionary, const char *entityName);
 int modifyAttribute (FILE *dataDictionary, long attributesHeader, const char *attributeName);
 int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecordsHeader);

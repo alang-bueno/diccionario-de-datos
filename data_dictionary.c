@@ -479,6 +479,14 @@ int hasAttributes(FILE *dataDictionary, long attributesHeader) {
     return firstAttr != NULL_POINTER;
 }
 
+int hasDataRecords(FILE *dataDictionary, long dataRecordsHeader) {
+    long firstRec;
+    fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+    if (fread(&firstRec, sizeof(long), 1, dataDictionary) != 1)
+        return 0;
+    return firstRec != NULL_POINTER;
+}
+
 int createAttribute(FILE *dataDictionary, long attributesHeader, Attribute attribute) {
  
     if (attribute.name[0] == '\0') {
@@ -604,7 +612,7 @@ int removeAttribute(FILE *dataDictionary, long attributesHeader, const char *att
  
     long currentAttributeDir = NULL_POINTER;
     long currentAttributePtr = attributesHeader;
-    int  attributeFound      = 0;
+    int  attributeFound = 0;
  
     fseek(dataDictionary, currentAttributePtr, SEEK_SET);
     if (fread(&currentAttributeDir, sizeof(long), 1, dataDictionary) != 1) {
@@ -667,8 +675,7 @@ int removeAttribute(FILE *dataDictionary, long attributesHeader, const char *att
             printAttributes(dataDictionary, attributesHeader);
         }
     } else {
-        printf("Error: No se encontró el atributo '%s' en esta entidad.\n",
-               attributeName);
+        printf("Error: No se encontró el atributo '%s' en esta entidad.\n", attributeName);
     }
  
     return attributeFound;
@@ -744,8 +751,12 @@ DataRecord generateDataRecord(FILE *dataDictionary, long attributesHeader) {
  
             case Integer: {
                 int *intData = (int *)malloc(sizeof(int));
-                printf("  Valor para '%s' (Integer, %d bytes): ", currentAttribute.name, currentAttribute.length);
-                scanf("%d", intData);
+                do {
+                    printf("  Valor para '%s' (Integer): ", currentAttribute.name);
+                    if (scanf("%d", intData) == 1) break;
+                    while (getchar() != '\n');
+                    printf("  Entrada inválida. Ingresa un número entero.\n");
+                } while (1);
                 while (getchar() != '\n');
  
                 newDataRecord.data = realloc(newDataRecord.data, newDataRecord.dataLength + sizeof(int));
@@ -762,8 +773,12 @@ DataRecord generateDataRecord(FILE *dataDictionary, long attributesHeader) {
  
             case Decimal: {
                 double *doubleData = (double *)malloc(sizeof(double));
-                printf("  Valor para '%s' (Decimal, %d bytes): ", currentAttribute.name, currentAttribute.length);
-                scanf("%lf", doubleData);
+                do {
+                    printf("  Valor para '%s' (Decimal): ", currentAttribute.name);
+                    if (scanf("%lf", doubleData) == 1) break;
+                    while (getchar() != '\n');
+                    printf("  Entrada inválida. Ingresa un número decimal.\n");
+                } while (1);
                 while (getchar() != '\n');
 
                 newDataRecord.data = realloc(newDataRecord.data, newDataRecord.dataLength + sizeof(double));
@@ -799,8 +814,10 @@ DataRecord generateDataRecord(FILE *dataDictionary, long attributesHeader) {
             case String: {
                 char *stringData = (char *)malloc(currentAttribute.length + 1);
                 memset(stringData, 0, currentAttribute.length + 1);
-                printf("  Valor para '%s' (String, %d bytes): ", currentAttribute.name, currentAttribute.length);
-                scanf(" %[^\n]", stringData);
+                printf("  Valor para '%s' (String, max %d chars): ", currentAttribute.name, currentAttribute.length);
+                char gfmt[16];
+                snprintf(gfmt, sizeof(gfmt), " %%%d[^\n]", currentAttribute.length);
+                scanf(gfmt, stringData);
                 while (getchar() != '\n' && !feof(stdin));
 
                 newDataRecord.data = realloc(newDataRecord.data, newDataRecord.dataLength + currentAttribute.length);
@@ -1014,6 +1031,8 @@ int modifyEntity(FILE *dataDictionary, const char *entityName) {
 
     long currentDir;
     long entityOffset = NULL_POINTER;
+    long prevPtr = MAIN_DATA_DICTIONARY_HEADER;
+
     fseek(dataDictionary, MAIN_DATA_DICTIONARY_HEADER, SEEK_SET);
     fread(&currentDir, sizeof(long), 1, dataDictionary);
 
@@ -1028,6 +1047,7 @@ int modifyEntity(FILE *dataDictionary, const char *entityName) {
             entityOffset = currentDir;
             break;
         }
+        prevPtr = currentDir + (long)sizeof(Entity) - (long)sizeof(long);
         currentDir = current.nextEntity;
     }
 
@@ -1057,14 +1077,43 @@ int modifyEntity(FILE *dataDictionary, const char *entityName) {
     memset(entity.name, 0, MAX_CHARS);
     strncpy(entity.name, newName, MAX_CHARS - 1);
 
+    long originalNext = entity.nextEntity;
+    fseek(dataDictionary, prevPtr, SEEK_SET);
+    if (fwrite(&originalNext, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo desconectar la entidad.\n");
+        return DD_FATAL;
+    }
+
+    long insertPtr = MAIN_DATA_DICTIONARY_HEADER;
+    long insertDir;
+    fseek(dataDictionary, MAIN_DATA_DICTIONARY_HEADER, SEEK_SET);
+    fread(&insertDir, sizeof(long), 1, dataDictionary);
+
+    while (insertDir != NULL_POINTER) {
+        Entity current;
+        fseek(dataDictionary, insertDir, SEEK_SET);
+        fread(&current, sizeof(Entity), 1, dataDictionary);
+
+        strToLower(existingLower, current.name, MAX_CHARS);
+        if (strcmp(newLower, existingLower) < 0)
+            break;
+        insertPtr = insertDir + (long)sizeof(Entity) - (long)sizeof(long);
+        insertDir = current.nextEntity;
+    }
+
+    entity.nextEntity = insertDir;
     fseek(dataDictionary, entityOffset, SEEK_SET);
     if (fwrite(&entity, sizeof(Entity), 1, dataDictionary) != 1) {
         printf("Error: No se pudo actualizar la entidad en disco.\n");
         return DD_FATAL;
     }
+    fseek(dataDictionary, insertPtr, SEEK_SET);
+    if (fwrite(&entityOffset, sizeof(long), 1, dataDictionary) != 1) {
+        printf("Error: No se pudo actualizar el enlace anterior.\n");
+        return DD_FATAL;
+    }
 
-    printf("Entidad renombrada de '%s' a '%s' correctamente.\n",
-           entityName, newName);
+    printf("Entidad renombrada de '%s' a '%s' correctamente.\n", entityName, newName);
     return DD_SUCCESS;
 }
 
@@ -1075,6 +1124,7 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
 
     long currentDir;
     long attrOffset = NULL_POINTER;
+    long prevPtr = attributesHeader;
     Attribute found;
 
     fseek(dataDictionary, attributesHeader, SEEK_SET);
@@ -1087,10 +1137,11 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
 
         strToLower(existingLower, current.name, MAX_CHARS);
         if (strcmp(searchLower, existingLower) == 0) {
-            found      = current;
+            found = current;
             attrOffset = currentDir;
             break;
         }
+        prevPtr = currentDir + (long)sizeof(Attribute) - (long)sizeof(long);
         currentDir = current.nextAttribute;
     }
 
@@ -1145,14 +1196,14 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
     int typeChoice;
     scanf("%d", &typeChoice);
 
-    AttributeType newType   = found.type;
-    int           newLength = found.length;
+    AttributeType newType = found.type;
+    int newLength = found.length;
 
     if (typeChoice >= 1 && typeChoice <= 4) {
         newType = (AttributeType)(typeChoice - 1);
         switch (newType) {
-            case Integer:   newLength = 4; break;
-            case Decimal:   newLength = 8; break;
+            case Integer: newLength = 4; break;
+            case Decimal: newLength = 8; break;
             case Character: newLength = 1; break;
             case String:
                 printf("Longitud del String (1-%d): ", MAX_CHARS);
@@ -1214,14 +1265,53 @@ int modifyAttribute(FILE *dataDictionary, long attributesHeader, const char *att
 
     memset(found.name, 0, MAX_CHARS);
     strncpy(found.name, newName, MAX_CHARS - 1);
-    found.type         = newType;
-    found.length       = newLength;
+    found.type = newType;
+    found.length = newLength;
     found.isPrimaryKey = newPK;
 
-    fseek(dataDictionary, attrOffset, SEEK_SET);
-    if (fwrite(&found, sizeof(Attribute), 1, dataDictionary) != 1) {
-        printf("Error: No se pudo actualizar el atributo en disco.\n");
-        return DD_FATAL;
+    if (strcmp(newLower, searchLower) == 0) {
+        fseek(dataDictionary, attrOffset, SEEK_SET);
+        if (fwrite(&found, sizeof(Attribute), 1, dataDictionary) != 1) {
+            printf("Error: No se pudo actualizar el atributo en disco.\n");
+            return DD_FATAL;
+        }
+    } else {
+        long originalNext = found.nextAttribute;
+        fseek(dataDictionary, prevPtr, SEEK_SET);
+        if (fwrite(&originalNext, sizeof(long), 1, dataDictionary) != 1) {
+            printf("Error: No se pudo desconectar el atributo.\n");
+            return DD_FATAL;
+        }
+
+        long insertPtr = attributesHeader;
+        long insertDir;
+        fseek(dataDictionary, attributesHeader, SEEK_SET);
+        fread(&insertDir, sizeof(long), 1, dataDictionary);
+
+        while (insertDir != NULL_POINTER) {
+            Attribute current;
+            fseek(dataDictionary, insertDir, SEEK_SET);
+            fread(&current, sizeof(Attribute), 1, dataDictionary);
+
+            char existLower[MAX_CHARS];
+            strToLower(existLower, current.name, MAX_CHARS);
+            if (strcmp(newLower, existLower) < 0)
+                break;
+            insertPtr = insertDir + (long)sizeof(Attribute) - (long)sizeof(long);
+            insertDir = current.nextAttribute;
+        }
+
+        found.nextAttribute = insertDir;
+        fseek(dataDictionary, attrOffset, SEEK_SET);
+        if (fwrite(&found, sizeof(Attribute), 1, dataDictionary) != 1) {
+            printf("Error: No se pudo actualizar el atributo en disco.\n");
+            return DD_FATAL;
+        }
+        fseek(dataDictionary, insertPtr, SEEK_SET);
+        if (fwrite(&attrOffset, sizeof(long), 1, dataDictionary) != 1) {
+            printf("Error: No se pudo actualizar el enlace anterior.\n");
+            return DD_FATAL;
+        }
     }
 
     printf("Atributo modificado correctamente.\n");
@@ -1251,37 +1341,50 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
     int dataLength = 0;
     for (int i = 0; i < attrCount; i++)
         dataLength += attrs[i].length;
-    dataLength += sizeof(long);
+    dataLength += (int)sizeof(long);
 
     printf("\nRegistros actuales:\n");
     printDataRecords(dataDictionary, attributesHeader, dataRecordsHeader);
 
-    int target;
-    printf("\nNúmero de registro a modificar: ");
-    scanf("%d", &target);
-    if (target < 1) {
-        printf("Error: Número de registro inválido.\n");
+    long firstRecord;
+    fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+    fread(&firstRecord, sizeof(long), 1, dataDictionary);
+    if (firstRecord == NULL_POINTER) {
+        printf("No hay registros para modificar.\n");
         return 0;
     }
 
-    long currentDir;
+    int target;
+    printf("\nNúmero de registro a modificar: ");
+    if (scanf("%d", &target) != 1 || target < 1) {
+        printf("Error: Número de registro inválido.\n");
+        while (getchar() != '\n');
+        return 0;
+    }
+    while (getchar() != '\n');
+
+    long currentRecordPtr = dataRecordsHeader;
+    long currentRecordDir;
     long recordOffset = NULL_POINTER;
+
     fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
-    fread(&currentDir, sizeof(long), 1, dataDictionary);
+    fread(&currentRecordDir, sizeof(long), 1, dataDictionary);
 
     int count = 1;
-    while (currentDir != NULL_POINTER) {
+    while (currentRecordDir != NULL_POINTER) {
         if (count == target) {
-            recordOffset = currentDir;
+            recordOffset = currentRecordDir;
             break;
         }
+        currentRecordPtr = currentRecordDir + dataLength - (long)sizeof(long);
         void *tmp = malloc(dataLength);
-        fseek(dataDictionary, currentDir, SEEK_SET);
+        if (!tmp) { printf("Error: Memoria insuficiente.\n"); return DD_FATAL; }
+        fseek(dataDictionary, currentRecordDir, SEEK_SET);
         fread(tmp, dataLength, 1, dataDictionary);
         long nextDir;
         memcpy(&nextDir, (char *)tmp + dataLength - sizeof(long), sizeof(long));
         free(tmp);
-        currentDir = nextDir;
+        currentRecordDir = nextDir;
         count++;
     }
 
@@ -1291,109 +1394,190 @@ int modifyDataRecord(FILE *dataDictionary, long attributesHeader, long dataRecor
     }
 
     void *block = malloc(dataLength);
+    if (!block) { printf("Error: Memoria insuficiente.\n"); return DD_FATAL; }
     fseek(dataDictionary, recordOffset, SEEK_SET);
-    fread(block, dataLength, 1, dataDictionary);
+    if (fread(block, dataLength, 1, dataDictionary) != 1) {
+        printf("Error: No se pudo leer el registro.\n");
+        free(block);
+        return 0;
+    }
     long nextRecord;
     memcpy(&nextRecord, (char *)block + dataLength - sizeof(long), sizeof(long));
 
     void *newBlock = malloc(dataLength);
+    if (!newBlock) { free(block); printf("Error: Memoria insuficiente.\n"); return DD_FATAL; }
     memset(newBlock, 0, dataLength);
 
-    int offset = 0;
-    long pkOffset = -1;
-    int  pkLength = 0;
+    printf("\nIngresa nuevos valores (Enter para mantener el actual):\n");
+
+    int fieldOffset = 0;
+    long pkOffset   = -1;
+    int  pkLength   = 0;
 
     for (int i = 0; i < attrCount; i++) {
-
+        int ch;
         switch (attrs[i].type) {
 
             case Integer: {
-                int val;
-                printf("  '%s' (Integer) [Enter para mantener valor actual]: ", attrs[i].name);
-                scanf("%d", &val);
-                while (getchar() != '\n');
-                memcpy((char *)newBlock + offset, &val, sizeof(int));
+                int current;
+                memcpy(&current, (char *)block + fieldOffset, sizeof(int));
+                printf("  '%s' (Integer) [actual: %d]: ", attrs[i].name, current);
+                ch = getchar();
+                int ival = current;
+                if (ch != '\n') {
+                    ungetc(ch, stdin);
+                    if (scanf("%d", &ival) != 1) ival = current;
+                    while (getchar() != '\n');
+                }
+                memcpy((char *)newBlock + fieldOffset, &ival, sizeof(int));
                 break;
             }
             case Decimal: {
-                double val;
-                printf("  '%s' (Decimal) [Enter para mantener valor actual]: ", attrs[i].name);
-                scanf("%lf", &val);
-                while (getchar() != '\n');
-                memcpy((char *)newBlock + offset, &val, sizeof(double));
+                double current;
+                memcpy(&current, (char *)block + fieldOffset, sizeof(double));
+                printf("  '%s' (Decimal) [actual: %.2f]: ", attrs[i].name, current);
+                ch = getchar();
+                double dval = current;
+                if (ch != '\n') {
+                    ungetc(ch, stdin);
+                    if (scanf("%lf", &dval) != 1) dval = current;
+                    while (getchar() != '\n');
+                }
+                memcpy((char *)newBlock + fieldOffset, &dval, sizeof(double));
                 break;
             }
             case Character: {
-                char val;
-                printf("  '%s' (Character): ", attrs[i].name);
-                scanf(" %c", &val);
-                while (getchar() != '\n');
-                memcpy((char *)newBlock + offset, &val, sizeof(char));
+                char current;
+                memcpy(&current, (char *)block + fieldOffset, sizeof(char));
+                printf("  '%s' (Character) [actual: %c]: ", attrs[i].name, current);
+                ch = getchar();
+                char cval = current;
+                if (ch != '\n') {
+                    cval = (char)ch;
+                    while (getchar() != '\n');
+                }
+                memcpy((char *)newBlock + fieldOffset, &cval, sizeof(char));
                 break;
             }
             case String: {
-                char val[MAX_CHARS + 1];
-                memset(val, 0, sizeof(val));
-                printf("  '%s' (String): ", attrs[i].name);
-                int c;
-                while ((c = getchar()) != '\n' && c != EOF);
-                scanf(" %49[^\n]", val);
-                while (getchar() != '\n' && !feof(stdin));
-                memcpy((char *)newBlock + offset, val, attrs[i].length);
+                char current[MAX_CHARS + 1];
+                memset(current, 0, sizeof(current));
+                memcpy(current, (char *)block + fieldOffset, attrs[i].length);
+                printf("  '%s' (String) [actual: %s]: ", attrs[i].name, current);
+                ch = getchar();
+                char sval[MAX_CHARS + 1];
+                memset(sval, 0, sizeof(sval));
+                if (ch == '\n') {
+                    memcpy(sval, current, attrs[i].length);
+                } else {
+                    ungetc(ch, stdin);
+                    char fmt[16];
+                    snprintf(fmt, sizeof(fmt), "%%%d[^\n]", attrs[i].length);
+                    scanf(fmt, sval);
+                    while (getchar() != '\n' && !feof(stdin));
+                }
+                memcpy((char *)newBlock + fieldOffset, sval, attrs[i].length);
                 break;
             }
             default: break;
         }
 
         if (attrs[i].isPrimaryKey == 'Y') {
-            pkOffset = offset;
+            pkOffset = fieldOffset;
             pkLength = attrs[i].length;
         }
-        offset += attrs[i].length;
+        fieldOffset += attrs[i].length;
     }
 
     memcpy((char *)newBlock + dataLength - sizeof(long), &nextRecord, sizeof(long));
 
-    if (pkOffset != -1) {
-        int pkChanged = (memcmp((char *)block  + pkOffset, (char *)newBlock + pkOffset, pkLength) != 0);
-        if (pkChanged) {
-            long checkDir;
-            fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
-            fread(&checkDir, sizeof(long), 1, dataDictionary);
+    int pkChanged = 0;
+    if (pkOffset != -1)
+        pkChanged = (memcmp((char *)block + pkOffset, (char *)newBlock + pkOffset, pkLength) != 0);
 
-            while (checkDir != NULL_POINTER) {
-                if (checkDir == recordOffset) {
-                    void *tmp = malloc(dataLength);
-                    fseek(dataDictionary, checkDir, SEEK_SET);
-                    fread(tmp, dataLength, 1, dataDictionary);
-                    long nd;
-                    memcpy(&nd, (char *)tmp + dataLength - sizeof(long), sizeof(long));
-                    free(tmp);
-                    checkDir = nd;
-                    continue;
-                }
+    if (pkChanged) {
+        long checkDir;
+        fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+        fread(&checkDir, sizeof(long), 1, dataDictionary);
+        while (checkDir != NULL_POINTER) {
+            if (checkDir == recordOffset) {
                 void *tmp = malloc(dataLength);
                 fseek(dataDictionary, checkDir, SEEK_SET);
                 fread(tmp, dataLength, 1, dataDictionary);
-
-                if (memcmp((char *)tmp + pkOffset, (char *)newBlock + pkOffset, pkLength) == 0) {
-                    printf("Error: Ya existe un registro con esa clave primaria.\n");
-                    free(tmp); free(block); free(newBlock);
-                    return 0;
-                }
                 long nd;
                 memcpy(&nd, (char *)tmp + dataLength - sizeof(long), sizeof(long));
                 free(tmp);
                 checkDir = nd;
+                continue;
             }
+            void *tmp = malloc(dataLength);
+            fseek(dataDictionary, checkDir, SEEK_SET);
+            fread(tmp, dataLength, 1, dataDictionary);
+            if (memcmp((char *)tmp + pkOffset, (char *)newBlock + pkOffset, pkLength) == 0) {
+                printf("Error: Ya existe un registro con esa clave primaria.\n");
+                free(tmp); free(block); free(newBlock);
+                return 0;
+            }
+            long nd;
+            memcpy(&nd, (char *)tmp + dataLength - sizeof(long), sizeof(long));
+            free(tmp);
+            checkDir = nd;
         }
-    }
 
-    fseek(dataDictionary, recordOffset, SEEK_SET);
-    if (fwrite(newBlock, dataLength, 1, dataDictionary) != 1) {
-        printf("Error: No se pudo actualizar el registro en disco.\n");
-        free(block); free(newBlock);
-        return DD_FATAL;
+        fseek(dataDictionary, currentRecordPtr, SEEK_SET);
+        if (fwrite(&nextRecord, sizeof(long), 1, dataDictionary) != 1) {
+            printf("Error: No se pudo reordenar el registro.\n");
+            free(block); free(newBlock);
+            return DD_FATAL;
+        }
+
+        DataRecord tempRec;
+        tempRec.data             = newBlock;
+        tempRec.primaryKeyOffset = pkOffset;
+        tempRec.primaryKeyLength = pkLength;
+        tempRec.dataLength       = dataLength;
+
+        long insertPtr = dataRecordsHeader;
+        long insertDir;
+        fseek(dataDictionary, dataRecordsHeader, SEEK_SET);
+        fread(&insertDir, sizeof(long), 1, dataDictionary);
+
+        while (insertDir != NULL_POINTER) {
+            void *existingBlock = malloc(dataLength);
+            if (!existingBlock) break;
+            fseek(dataDictionary, insertDir, SEEK_SET);
+            fread(existingBlock, dataLength, 1, dataDictionary);
+            if (comparePK(&tempRec, existingBlock) < 0) {
+                free(existingBlock);
+                break;
+            }
+            long nd;
+            memcpy(&nd, (char *)existingBlock + dataLength - sizeof(long), sizeof(long));
+            free(existingBlock);
+            insertPtr = insertDir + dataLength - (long)sizeof(long);
+            insertDir = nd;
+        }
+
+        memcpy((char *)newBlock + dataLength - sizeof(long), &insertDir, sizeof(long));
+        fseek(dataDictionary, recordOffset, SEEK_SET);
+        if (fwrite(newBlock, dataLength, 1, dataDictionary) != 1) {
+            printf("Error: No se pudo actualizar el registro.\n");
+            free(block); free(newBlock);
+            return DD_FATAL;
+        }
+        fseek(dataDictionary, insertPtr, SEEK_SET);
+        if (fwrite(&recordOffset, sizeof(long), 1, dataDictionary) != 1) {
+            printf("Error: No se pudo actualizar el enlace anterior.\n");
+            free(block); free(newBlock);
+            return DD_FATAL;
+        }
+    } else {
+        fseek(dataDictionary, recordOffset, SEEK_SET);
+        if (fwrite(newBlock, dataLength, 1, dataDictionary) != 1) {
+            printf("Error: No se pudo actualizar el registro en disco.\n");
+            free(block); free(newBlock);
+            return DD_FATAL;
+        }
     }
 
     printf("Registro %d modificado correctamente.\n", target);
